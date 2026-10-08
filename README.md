@@ -45,6 +45,11 @@ Start at [`docs/README.md`](docs/README.md). The short map:
 | Set up, build, sign, debug | [`docs/development/`](docs/development/) |
 | Contribute | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | See what is planned or decided | [`docs/project/roadmap.md`](docs/project/roadmap.md), [`docs/project/decisions.md`](docs/project/decisions.md) |
+| Check the protocol sources | [`docs/project/references.md`](docs/project/references.md) |
+
+## License
+
+[MIT](LICENSE) (the `LICENSE` file sits at the repository root). Third-party material referenced for protocol research is not included; see [`docs/project/references.md`](docs/project/references.md).
 
 ## Project status
 
@@ -60,4 +65,4 @@ scripts/             android-dev.sh, uinput-helper.sh, sign-apk.sh
 docs/                Documentation
 ```
 
-The sibling folders `decompilado-moga-universal/` (decompiled original app) and `moga-uinput/` (Linux reference implementation) live outside this repository and are read-only protocol references.
+The protocol was reverse-engineered from two external projects that are **not** in this repository: the original *MOGA Universal Driver* 3.1.4 APK (decompiled with jadx 1.5.6) and the [`moga-uinput`](https://github.com/jakobend/moga-uinput) Linux reference. Where to get them and how to recreate them is in [`docs/project/references.md`](docs/project/references.md); you do not need them to build or contribute.

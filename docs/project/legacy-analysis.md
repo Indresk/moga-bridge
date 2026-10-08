@@ -1,6 +1,6 @@
 # Legacy app and reference analysis
 
-The behaviour of this project is anchored to two read-only references that live outside this repository: the decompiled original app (`decompilado-moga-universal`, package `net.obsidianx.android.mogaime`) and the Linux implementation (`moga-uinput`). This page records what they do and how we differ.
+The behaviour of this project is anchored to two read-only references that are **not part of this repository**: the original app *MOGA Universal Driver* 3.1.4 (package `net.obsidianx.android.mogaime`, decompiled with jadx 1.5.6 into a local `decompilado-moga-universal/` folder) and the Linux implementation [`moga-uinput`](https://github.com/jakobend/moga-uinput) (MIT, Jakob Endrikat). Where to get both and how to recreate them: [references.md](references.md). This page records what they do and how we differ; file and class names below refer to those local copies.
 
 ## What the original app does
 

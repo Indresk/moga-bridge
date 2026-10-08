@@ -1,6 +1,6 @@
 # MOGA Mode A protocol
 
-Everything in this page is implemented in `src-tauri/src/protocol/` and `src-tauri/src/constants/protocol.rs`, independent of any platform. Sources: the decompiled legacy app (`BluetoothThread`, `MOGAPocketState`) and the Linux reference (`moga-uinput.py`); see [legacy-analysis](../project/legacy-analysis.md) for how they differ.
+Everything in this page is implemented in `src-tauri/src/protocol/` and `src-tauri/src/constants/protocol.rs`, independent of any platform. Sources: the decompiled legacy app (`BluetoothThread`, `MOGAPocketState`) and the Linux reference (`moga-uinput.py`); neither is in this repository — see [references](../project/references.md) for where they come from, and [legacy-analysis](../project/legacy-analysis.md) for how they differ.
 
 ## Transport
 

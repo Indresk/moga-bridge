@@ -26,3 +26,8 @@ dist-ssr
 # Python bytecode (scripts/virtual-pad.py)
 __pycache__/
 *.pyc
+
+# Third-party protocol references (kept local, never committed)
+/decompilado-moga-universal/
+/moga-uinput/
+*.apk

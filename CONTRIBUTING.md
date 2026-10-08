@@ -67,4 +67,4 @@ For connection problems also include the in-app error text (it lists every socke
 
 ## 7. License
 
-No license file has been added yet. Until the maintainers choose one, treat the code as all-rights-reserved and ask before redistributing. If you are a maintainer, adding a `LICENSE` is the first thing to do before inviting outside contributions.
+The project is released under the [MIT License](LICENSE) (the file lives at the repository root). By contributing you agree that your contribution is licensed under the same terms. Do not add code or assets copied from third-party sources unless their licence is compatible and credited; the original MOGA app and its decompiled sources must never be committed ([references](docs/project/references.md)).

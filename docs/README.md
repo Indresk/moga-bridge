@@ -38,6 +38,7 @@ Read in this order.
 | [`project/roadmap.md`](project/roadmap.md) | What is open, grouped by area, and what is explicitly out of scope. |
 | [`project/decisions.md`](project/decisions.md) | Why things are the way they are (and what was tried and rejected). |
 | [`project/legacy-analysis.md`](project/legacy-analysis.md) | What the original app and the Linux reference do, and how we differ. |
+| [`project/references.md`](project/references.md) | Where the original APK and the Linux reference come from (not in the repository) and how to recreate the decompiled sources. |
 
 ## Conventions used in these docs
 

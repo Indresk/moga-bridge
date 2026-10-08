@@ -49,3 +49,6 @@ Keeps the process important while a controller is connected and tells the user t
 
 ## Do not store personal information in the repository
 The identifier, package names and scripts avoid personal names; keystores live outside the repo.
+
+## MIT licence, and a reimplementation rather than a port
+The project is MIT-licensed. The original MOGA app is proprietary and `moga-uinput` is a separate MIT project; neither is copied. We reimplemented the behaviour from the protocol facts they reveal (byte layouts, command bytes, connection order), wrote our own code and tests, and keep the references out of the repository ([references.md](references.md)). Only a few controller glyphs from the original app are reused, as a homage. If a rights holder objects to them, replace them.

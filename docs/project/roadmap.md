@@ -55,7 +55,7 @@ Open work only; finished work is summarised at the bottom. Effort: **S** (hours)
 - [ ] **End-to-end test with the mock driver** (M) — verify events reach the frontend.
 - [ ] **Android API-level smoke matrix and release notes** (L) — supported hardware/versions, known limits.
 - [ ] **Privacy and permissions review before release** (S).
-- [ ] **Choose and add a LICENSE** (S) — required before inviting outside contributions.
+- [ ] **Add the `LICENSE` file (MIT)** (S) — the license is decided; the file is being added at the repository root from GitHub. Until it lands, the `LICENSE` links in the README and CONTRIBUTING point to a file that does not exist yet.
 
 ## Desktop targets
 

@@ -4,7 +4,7 @@ Short rules for AI/code assistants working in this repository. Everything else i
 
 ## Ground rules
 
-- Change files only inside this repository. The sibling folders `decompilado-moga-universal/` (decompiled original app) and `moga-uinput/` (Linux reference) are **read-only** protocol references.
+- Change files only inside this repository. `decompilado-moga-universal/` (jadx 1.5.6 output of the MOGA Universal Driver 3.1.4 APK) and `moga-uinput/` (the Linux reference) may exist as sibling folders on a developer's machine; they are **read-only** protocol references, are not part of the repository, and must never be committed. Sources and how to recreate them: [`docs/project/references.md`](docs/project/references.md).
 - Respect the layering: Rust `constants`/`utils` → `schemas` → `protocol` → `drivers` → `services` → `commands`; frontend `lib` → `hooks` → `components` → `views` → `App`. See [`docs/architecture/backend-rust.md`](docs/architecture/backend-rust.md) and [`docs/architecture/frontend.md`](docs/architecture/frontend.md).
 - Keep the Kotlin command names identical to the strings in `src-tauri/src/drivers/android.rs`; keep event names identical in `constants/events.rs` and `src/lib/events.js`; keep control names identical in `schemas/settings.rs`, `MogaPreferences.kt` and `src/lib/keys.js`.
 - UI strings are Spanish; code, comments and developer docs are English.
