@@ -1,0 +1,50 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--bg);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+code {
+  border-radius: 3px;
+  padding: 0.05rem 0.35rem;
+  color: var(--holo-blue);
+  background: #0e0f10;
+  font-size: 0.9em;
+}
+
+pre {
+  overflow: auto;
+  margin: 0.75rem 0 0;
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  color: #bfe6f5;
+  background: #0e0f10;
+  font-size: 0.8rem;
+}
+
+details {
+  margin-top: 1rem;
+  color: var(--text-muted);
+}
+
+summary {
+  cursor: pointer;
+}
+
+.app-shell {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 1.25rem var(--gutter) 2.5rem;
+}

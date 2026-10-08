@@ -1,0 +1,29 @@
+/*
+ * Design tokens. The palette is a homage to the legacy MOGA Universal app, which used the
+ * Android "Holo" look: blue accent (#33B5E5), green "on" state (#66CC00) and dark greys.
+ */
+:root {
+  --holo-blue: #33b5e5;
+  --holo-blue-dark: #0099cc;
+  --moga-green: #66cc00;
+  --holo-orange: #ffbb33;
+  --holo-red: #ff4444;
+
+  --bg: #141516;
+  --surface: #1e1f20;
+  --surface-raised: #272829;
+  --border: #353637;
+  --text: #ececec;
+  --text-muted: #9a9c9e;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --gutter: 1rem;
+
+  font-family: Roboto, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}

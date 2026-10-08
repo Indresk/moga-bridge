@@ -5,11 +5,25 @@ This document records protocol and architecture facts that should be kept consis
 ## Scope and current state
 
 - Make project changes only in this `moga-tauri/` tree. The sibling `decompilado-moga-universal/` and `moga-uinput/` directories are read-only protocol references.
-- `src-tauri/src/protocol.rs` is transport-independent and owns framing, checksum validation, and byte-to-state conversion.
-- `src-tauri/src/driver.rs` defines `MogaDriver`, `MogaConnection`, `InputMapper`, and the serializable `KeyMapping`. `PlatformDriver` is the explicit unavailable adapter on desktop; the test-only `MockDriver` exercises byte parsing.
-- On Android, `src-tauri/src/android.rs` registers Tauri's Android plugin through `PluginApi::register_android_plugin` and replaces the app's driver with `AndroidDriver`. Tauri owns the JNI calls to the app's Kotlin plugin; do not build a second JNI mechanism around the same socket.
-- `src-tauri/src/lib.rs` exposes paired-device scan, active unpaired discovery start/stop, connect, disconnect, status, Bluetooth permission, mapping read/write, and IME settings commands. The connection worker emits `moga-status`, `moga-state`, and `moga-error`.
-- Android's paired-device enumeration and RFCOMM socket are implemented in `gen/android/app/src/main/java/com/rafa_linux/moga_tauri/moga/MogaAndroidPlugin.kt`; the IME is `MogaInputMethodService.kt`.
+- Android's paired-device enumeration and RFCOMM socket are implemented in `gen/android/app/src/main/java/dev/mogabridge/app/moga/MogaAndroidPlugin.kt`; the IME is `MogaInputMethodService.kt`; the virtual gamepad bridge is `UinputBridge.kt`; the connection notification is `MogaConnectionService.kt`.
+
+## Architecture
+
+Rust (`src-tauri/src/`), layered; a layer only imports from layers above it in this list:
+
+| Layer | Path | Responsibility |
+|---|---|---|
+| Constants | `constants/` | Wire-protocol numbers and bit masks, event names, plugin ids, key-code limit. No logic. |
+| Utils | `utils/` | Pure helpers: XOR checksum, signed-axis decoding. |
+| Schemas | `schemas/` | Serialisable data shapes: `MogaState`/`Buttons`/`Stick`, `DeviceInfo`, `ConnectionState`/`ConnectionStatus`, `KeyMapping`, `OutputMode`/`OutputSettings`, `ProtocolError`. |
+| Protocol | `protocol/` | Transport-independent: `build_command`, `parse_report`, `PacketStreamParser` (+ test fixtures). |
+| Drivers | `drivers/` | Platform boundary: traits `MogaDriver`, `MogaConnection`, `InputMapper`; `UnsupportedDriver` (desktop), `MockDriver` (tests), `android.rs` (`AndroidDriver` over the Tauri plugin handle). |
+| Services | `services/` | `AppState` (driver + status) and the connection session (handshake, read loop, event emission). |
+| Commands | `commands/` | Thin Tauri handlers (`devices`, `connection`, `settings`) registered in `lib.rs`. |
+
+Add a command by writing the handler in `commands/`, registering it in `lib.rs`, and adding a wrapper in the frontend's `src/lib/api.js`.
+
+Frontend (`src/`): `lib/` (`api.js` is the only place that calls `invoke`/`listen`; `events.js`, `keys.js`, `platform.js`) → `hooks/` (`useController`, `useDeviceDiscovery`, `useKeyMapping`, `useOutputSettings`) → `components/` (presentational, reusable) → `views/` (`ConnectionView`, `TestView`, `MappingView`) → `App.jsx` (composition root, owns the shared error) ; styles in `styles/` (design tokens in `tokens.css`). Visual identity is a homage to the legacy app: Holo blue `#33B5E5`, "on" green `#66CC00`, controller glyphs copied to `src/assets/legacy/`.
 
 ## Bluetooth protocol
 
@@ -35,10 +49,12 @@ Offsets below are absolute report offsets. The Linux prototype names the control
 | 4 | `20` | Select |
 | 4 | `40` | Left bumper |
 | 4 | `80` | Right bumper |
-| 5 | `01 / 02 / 04 / 08` | Left-pad Up / Down / Left / Right |
-| 5 | `10 / 20 / 40 / 80` | Right-pad Up / Down / Left / Right |
-| 6 / 7 | raw bytes | Left X / Left Y |
-| 8 / 9 | raw bytes | Right X / Right Y |
+| 5 | `01 / 02 / 04 / 08` | Left stick, digitised: Up / Down / Left / Right |
+| 5 | `10 / 20 / 40 / 80` | Right stick, digitised: Up / Down / Left / Right |
+| 6 / 7 | signed byte | Left stick analog X / Y |
+| 8 / 9 | signed byte | Right stick analog X / Y |
+
+**The "pads" of byte 5 are the two analog sticks** (the legacy app calls them `LeftUp…`/`RightUp…`; its own text says joysticks cannot be used as analogs through the keyboard mode, "only DPads"). They are not a physical D-pad. Confirmed on hardware: pushing the left stick down sets bit `02` and byte 7 = `128`. The Rust state exposes `leftStick`/`rightStick` with `x`/`y` in `-127..=127` (x right-positive, y down-positive) plus the four digital flags. The MOGA *Pro* uses the same offsets differently (D-pad + triggers + stick clicks); only the Pocket layout is implemented. Where a physical D-pad of the user's unit reports, if it has one, is unverified.
 
 Java reads the four axes directly as byte values. The Linux Python prototype normalizes values with its signed conversion (`>= 128` becomes `value - 255`) and inverts both Y axes. Keep the raw bytes in core state until hardware traces verify the desired shared normalization; do not conflate the Java and Python semantics.
 
@@ -46,7 +62,7 @@ Java reads the four axes directly as byte values. The Linux Python prototype nor
 
 - Java checks checksum and 12-byte blocks, but does not check the `0x7A` marker or response ID in the described input path.
 - Python validates `0x7A`, declared size, XOR, player, and base response IDs, but its receive payload slicing and extra-length handling deserve separate verification before being copied.
-- This Rust baseline uses the strict Python marker/response checks for fixed 12-byte reports and keeps raw axes. Treat packet-length extensions and further response IDs as explicit protocol changes with tests.
+- This Rust baseline uses the strict Python marker/response checks for fixed 12-byte reports; axes are decoded as described above and the raw 12 bytes travel with every state (`raw`). Treat packet-length extensions and further response IDs as explicit protocol changes with tests.
 - Python's generalized base button mapping is not proven to describe every MOGA generation; this implementation specifically follows the Java Pocket state mapping.
 
 ## Rust state/command flow
@@ -69,7 +85,7 @@ Keep transport, parser, and input-output mapping separate. Future Windows and Li
 - Android 12+ requests `BLUETOOTH_CONNECT` and `BLUETOOTH_SCAN`; Android 6–11 requests `ACCESS_FINE_LOCATION` for Classic discovery. `neverForLocation` is declared for the modern scan permission. Keep the requested permission surface limited to these Bluetooth operations.
 - The legacy `AddDeviceFragment` explicitly calls `BluetoothState.pair()`, which reflectively invokes public `BluetoothDevice.createBond()`, shows a pairing-progress dialog, and waits up to 20 seconds for a `BOND_BONDED` broadcast. It does **not** skip OS bonding. Its sources contain no `ACTION_PAIRING_REQUEST`, `setPin()`, or `abortBroadcast()` handling.
 - The legacy `BluetoothThread.connect()` attempts these strategies in order: (1) reflected hidden `BluetoothSocket` constructor `(TYPE_RFCOMM, -1, false, true, device, -1, ParcelUuid(SPP_UUID))`; (2) reflected `BluetoothDevice.createRfcommSocket(1)`; (3) public `createInsecureRfcommSocketToServiceRecord(SPP_UUID)`; (4) public secure `createRfcommSocketToServiceRecord(SPP_UUID)`. All failures fall through to the next attempt. Our plugin adds a fifth, `createInsecureRfcommSocket(1)` (`reflectedInsecureChannelOne`), after the secure channel-1 attempt.
-- `LEGACY_RFCOMM_FALLBACKS` in `driver.rs` is serialized to the Kotlin plugin and is the single ordered strategy list. Hidden reflection may be blocked by Android hidden-API enforcement; catch that failure and keep trying the remaining documented methods. Close each failed candidate socket before proceeding.
+- `RFCOMM_STRATEGIES` in `drivers/mod.rs` is serialized to the Kotlin plugin and is the single ordered strategy list. Hidden reflection may be blocked by Android hidden-API enforcement; catch that failure and keep trying the remaining documented methods. Close each failed candidate socket before proceeding.
 - `connect` requires a completed bond first, matching the legacy app's add-device flow. Public insecure RFCOMM is unauthenticated at the socket layer; it does not undo an existing bond or guarantee bypassing the Android bond UI. Never describe it as an OS-pairing bypass.
 - After `BluetoothSocket.connect()` succeeds and streams are obtained, the legacy app immediately signals connected and writes player-select (`0x43`) followed by reset/poll (`0x41`), then flushes. It sends listen (`0x44`) and flushes before every blocking read. There is no challenge-response in the active code, and `CONNECTION_DELAY_MS = 2000` is declared but unused there. Our plugin intentionally deviates: it waits 2 s after bonding and runs up to 3 rounds of the whole strategy list (500 ms apart), because the Pocket often refuses the first connect right after bonding/inquiry. The only active sleep is 500 ms after a read loop exits before reconnecting.
 - **Never call `setPin()` or `abortBroadcast()` to hide/bypass system pairing UI.** Normal third-party apps lack the needed privileged permission. Android owns confirmation/PIN entry, and bonding receivers are always unregistered in `finally`.
@@ -81,11 +97,25 @@ Keep transport, parser, and input-output mapping separate. Future Windows and Li
 - `moga-state` is the second, in-app hook for a future game/emulator hosted in the app's own webview. It is an application event, not an external-application injection API.
 - Before release, validate permission denial/revocation, Bluetooth-off state, reconnect and teardown races, IME selection/focus requirements, mapping collisions, and actual Mode A hardware on supported Android API levels.
 
+## Output modes
+
+- **Gamepad (default)**: `UinputBridge.kt` streams JSON (`register`, `inject`) to a loopback socket served by `toybox nc -s 127.0.0.1 -p 7777 -L uinput -`, started from the PC by `scripts/uinput-helper.sh` (`pnpm android:uinput`) as the adb `shell` user (which may open `/dev/uinput`). Android then sees a `GAMEPAD|JOYSTICK` device with `ABS_X/Y/RX/RY` (-127..127, flat 8) and `BTN_SOUTH/EAST/NORTH/WEST` (Android A/B/X/Y), `BTN_TL/TR`, `BTN_SELECT/START`. Verified end to end: PPSSPP detects it and advances its menus and a game's title screen. A device only exists while a controller is connected. The `uinput` tool wants a *stream of JSON objects*, not a JSON array.
+- The Test tab has an **isolation** switch (`isolated`, off by default, in memory only): while on, the bridge is suspended so the controller can be tried inside the app without navigating its UI; held inputs are released. The backend turns it off when the activity pauses (another app, notification shade) and the frontend turns it off when the Test tab is left.
+- **UI rules for the helper** (Mapeo tab): `HelperPanel` is its own panel titled "Ayudante uinput" with a status tag. Not running: what it is, numbered steps and a copyable command, with a note that the screen updates by itself. Running: a one-line confirmation and a "Ver información" toggle (the same text on demand). The tab re-reads the helper state by polling (`usePolling`, 3 s while waiting, 10 s once running), so there is no manual "check" button. The **Gamepad virtual** option is disabled with a reason until the helper is reachable, and the effective mode shown is keyboard in that case (the saved preference is kept and applies again when the helper returns).
+- **Stick layout** (virtual gamepad only; `StickLayout`, persisted in the `moga-output` prefs): `analogs` (default), `leftDpad` (left stick becomes the D-pad, right stays analog) or `rightDpad`. A converted stick stops driving its analog axes (held at 0) and drives `ABS_HAT0X/Y` from the controller's own digitised direction bits. The hat axes are always registered. The setting applies on the next report.
+- **Polling policy** (Mapeo tab, `usePolling`): the helper state is re-read only while the Mapeo tab is mounted **and** `document.visibilityState` is `visible`; it stops on tab change, unmount, another app or screen off, and polls once immediately on return. While the helper is not running: every 3 s for 20 attempts, then every 10 s; once running: every 15 s. Each poll costs one short loopback connection on a Kotlin thread (skipped when the bridge already holds a socket) and no file writes (`HelperFiles.prepare` writes only on change).
+- **Compatibility disclaimer**: the mapping is for the MOGA Pocket (Mode A) only; shown in the Mapeo tab and in the docs. MOGA Pro uses the same offsets differently and is unsupported.
+- **Idle power-off**: the controller turns itself off after a period without input. `services/connection.rs` appends an explanatory hint (`IDLE_POWER_OFF_HINT`) to unexpected disconnects/errors (not to user-requested disconnects), the Connection tab states it permanently, and the app returns to that tab when a connected session ends unexpectedly.
+- **Keyboard (IME)**: `MogaInputMethodService` only reaches focused text editors, so it cannot drive games or emulators; kept as a fallback.
+- **Helper hardening**: the helper is no longer a bare `nc`+`uinput`. The app writes `helper.token` (24 random bytes, hex) and a generated `helper.sh` (from `res/raw/helper_script.sh`) into its external private directory (`Android/data/<pkg>/files`, via `HelperFiles.kt`). The helper runs `toybox nc -s 127.0.0.1 -p 7777 -L sh -c 'read -r -t 5 t …; exec uinput -'`: the first line of every connection must equal the token (re-read on each connection) or the connection is dropped before any device is created. Verified: no token / wrong token ⇒ 0 devices, right token ⇒ device registered. Limits: on Android ≤10 other apps with storage permission can read that directory; a rogue connection can hold a shell process for up to 5 s. A stronger design is a small `app_process` daemon on an abstract socket that checks the peer UID.
+- The helper is not a persistent service: it lives until the phone reboots. Starting it without a PC (wireless debugging or Shizuku) is future work.
+- **Battery**: no source found. The legacy app has none, the 12-byte report has no documented field (the raw report is shown in the Test view to look for one), and Android lists the BD&A with the SPP profile only (`BATTERY=-1`), so `BluetoothDevice` battery APIs return nothing.
+
 ## Hardware validation status
 
 - Verified on a Xiaomi 24117RN76L (Android 16, API 36) with a real MOGA Pocket in Mode A: discovery by name `BD&A`, Android-confirmed bonding, RFCOMM connection, and live reports. The diagnostics view shows `responseId` 100 (`0x64`), player 1, and correct button/d-pad changes, so the strict 12-byte parser accepts real traffic.
 - The plugin logs the winning socket strategy under logcat tag `MogaRfcomm` (`RFCOMM connected with strategy=...`), and every failed one as a warning. Observed result on that device: strategy 1 (reflected constructor) is unavailable because Android 16 blocks the 7-arg `BluetoothSocket` constructor, and strategy 2 (`createRfcommSocket(1)`, i.e. the legacy hard-coded channel 1) connects on round 1. Keep the other fallbacks for older/other devices.
-- Axes are still raw bytes (e.g. `[0, 128, 0, 0]` at rest); normalization is undecided.
+- Axis capture: left stick pushed down => bytes 6..9 = `[0, 128, 0, 0]`; down+left => `[128, 192, 0, 0]`. Decoded with `value >= 128 ? value - 255 : value`, y inverted (down positive). Sign/range of the right stick and full-range values are not yet verified on hardware.
 
 ## Dev-environment pitfalls
 

@@ -33,13 +33,22 @@ The protocol decoder is platform-independent. Android's native plugin performs b
 
 ## Android no-root strategy and limits
 
+End-user setup steps are in [usuario.md](./usuario.md).
+
+**Supported hardware:** the button mapping (report layout, sticks, buttons) is designed for the **MOGA Pocket in Mode A** only. Other models such as the MOGA Pro use different layouts (D-pad, triggers, stick clicks) and are not supported yet; the app says so in the Mapeo tab.
+
+**Idle power-off:** the controller powers itself off after a while without input. The app treats this as expected: it shows an explanatory message and returns to the Connection tab.
+
+**Default output: virtual gamepad.** The app streams the controller to Android's own `uinput` tool through an adb-started loopback helper (`pnpm android:uinput`, no root), so games and emulators see a real gamepad with analog sticks. The keyboard IME below is only a fallback for text fields.
+
+
 The transport is a normal Android Bluetooth RFCOMM socket; root access is not needed to read that socket. Do **not** use Linux `uinput` or Windows `ViGEmBus` for Android.
 
 The primary output is a configurable `InputMethodService` key mapper. Users must enable and select “MOGA Key Mapper” in Android keyboard settings. It calls `sendDownUpKeyEvents` when mapped controls transition from released to pressed. This is only useful while the IME is active for a focused editor, and can work only with apps/emulators that accept those keyboard events. It is not raw gamepad/HID injection and does not promise control of arbitrary native games.
 
 The secondary future-proof hook is the Tauri `moga-state` event, emitted from Rust for each valid controller report. A built-in game/emulator hosted in this app's webview can consume this event without routing controls through the IME.
 
-The Android app declares Bluetooth scan/connect and legacy location permissions plus the IME service. Native code lives in the generated app module at `src-tauri/gen/android/app/src/main/java/com/rafa_linux/moga_tauri/moga/`; preserve these files when regenerating Android project sources.
+The Android app declares Bluetooth scan/connect and legacy location permissions plus the IME service. Native code lives in the generated app module at `src-tauri/gen/android/app/src/main/java/dev/mogabridge/app/moga/`; preserve these files when regenerating Android project sources.
 
 ## Protocol baseline
 

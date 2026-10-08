@@ -29,13 +29,42 @@ This checklist reflects the current implementation: a Rust protocol parser/drive
 - [x] `pnpm android:dev` (`scripts/android-dev.sh`): `adb reverse` for Vite ports plus `--host 127.0.0.1`, working around a firewalled LAN IP.
 - [x] Declare the runtime Android plugin in `build.rs` (`InlinedPlugin`) and grant `moga-android:default` so `addPluginListener` works.
 - [x] Add [develop.md](./develop.md) with dev-loop, APK build, logging and troubleshooting instructions.
-- [ ] Add a script/CI job for release APK builds and signing.
+- [x] `pnpm android:sign` (`scripts/sign-apk.sh`): zipalign + apksigner + verify for the release APK.
+- [x] Neutral app identifier `dev.mogabridge.app` (was a personal one).
+- [ ] Run release builds and signing in CI (keystore as a secret).
+
+## Virtual gamepad and notification
+
+- [x] Virtual gamepad through Android's `uinput` (adb-started loopback helper), with analog sticks; PPSSPP detects it and responds in menus and in game.
+- [x] "Isolate the controller" switch in the Test tab (off by default; resets when the app leaves the screen or the tab is left).
+- [x] Persistent foreground-service notification while connecting/connected, with a Disconnect action.
+- [x] Verified with the real controller in PPSSPP after the stick fix (user report: works).
+- [x] Connection notification verified on device.
+- [ ] Verify stick direction, range and the right stick against hardware; add dead-zone/calibration settings.
+- [ ] Find out whether the user's unit has a physical D-pad and where it reports.
+- [x] Harden the helper: per-install secret token, loopback only (see agents.md).
+- [x] Helper panel redesign: status tag, steps only when not running, info on demand, gamepad option disabled without helper, automatic status polling instead of a check button.
+- [x] Stick layout setting: two analogs, or one stick converted to a D-pad (either side).
+- [x] Helper polling limited to the visible Mapeo tab with back-off; no file writes per poll.
+- [x] Pocket-only compatibility disclaimer (app + docs) and idle power-off messaging.
+- [ ] Verify stick-to-D-pad conversion with the real controller.
+- [ ] Replace the token check with a peer-UID-checked daemon (`app_process`) for Android ≤10.
+- [ ] Start the uinput helper without a PC (wireless debugging pairing or Shizuku).
+- [ ] Battery level: no known source (see agents.md); inspect the raw report across battery states.
+- [ ] Support the MOGA Pro layout (D-pad, triggers, stick clicks).
+
+## Architecture
+
+- [x] Rust backend split into `constants`, `utils`, `schemas`, `protocol`, `drivers`, `services`, `commands`.
+- [x] Frontend split into `lib` (api), `hooks`, `components`, `views`, `styles`; legacy-app palette and assets.
+- [ ] Split `MogaAndroidPlugin.kt` (discovery, RFCOMM connector, output settings) into smaller classes.
+- [ ] Frontend tests (hooks and components).
 
 ## Android no-root input destination
 
 - [x] Select the Virtual Keyboard / `InputMethodService` mapper as the primary no-root destination, with the supported boundary limited to keyboard-compatible focused editors.
 - [x] Add `MogaInputMethodService`, its Android manifest declaration, IME metadata, and an explicit Android keyboard-settings entry point.
-- [x] Add configurable key mappings for face buttons, system buttons, bumpers, and both d-pads; persist them in Android `SharedPreferences`.
+- [x] Add configurable key mappings for face buttons, system buttons, bumpers, and the two sticks' digital directions; persist them in Android `SharedPreferences`.
 - [x] Dispatch one `sendDownUpKeyEvents` tap per newly pressed mapped key, suppressing repeated events while a control remains held.
 - [ ] Verify IME active/focus requirements on real devices and determine whether the intended emulator/game targets accept IME keyboard events.
 - [ ] Improve onboarding so users can enable and select the IME and understand that it is not universal gamepad injection.
@@ -44,7 +73,7 @@ This checklist reflects the current implementation: a Rust protocol parser/drive
 
 ## Protocol and device validation
 
-- [x] Real Mode A reports are accepted by the strict parser (12 bytes, `0x7A`, response `0x64`, player 1, XOR); buttons and d-pad confirmed in the diagnostics view.
+- [x] Real Mode A reports are accepted by the strict parser (12 bytes, `0x7A`, response `0x64`, player 1, XOR); buttons and sticks confirmed in the diagnostics view. The "d-pad" bits are the digitised sticks.
 - [ ] Capture and store longer Mode A report streams (including poll `0x61` responses) as golden fixtures.
 - [ ] Verify checksum coverage, resynchronization after dropped/corrupt bytes, and whether responses may exceed 12 bytes.
 - [ ] Confirm the Pocket bit matrix for every button, both directional pads, and simultaneous button combinations.
@@ -57,7 +86,8 @@ This checklist reflects the current implementation: a Rust protocol parser/drive
 - [x] Replace the Android "adapter unavailable" scan response with paired-device and active unpaired-device discovery and show separate device lists.
 - [x] Add Android permission request, discovery UI, mapping controls, and Bluetooth error display.
 - [ ] Add loading/empty/error polish and clear disconnect/retry UX, especially around native connection teardown.
-- [ ] Render button, d-pad, and stick state in an accessible live diagnostics view; avoid flooding the UI with unthrottled events.
+- [x] Live diagnostics view (Test tab): buttons, both analog sticks and the raw report.
+- [ ] Make the diagnostics accessible and throttle UI updates if event rate becomes a problem.
 - [ ] Add settings for mapping, player ID, reporting mode, and axis calibration only after protocol behavior is verified.
 - [ ] Add localization, keyboard/screen-reader accessibility, and responsive-device testing.
 

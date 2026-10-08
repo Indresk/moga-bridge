@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "android:dev": "sh scripts/android-dev.sh"
+    "android:dev": "sh scripts/android-dev.sh",
+    "android:sign": "sh scripts/sign-apk.sh",
+    "android:uinput": "sh scripts/uinput-helper.sh"
   },
   "dependencies": {
     "react": "^19.1.0",
