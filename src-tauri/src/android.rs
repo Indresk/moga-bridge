@@ -10,7 +10,9 @@ use tauri::{
 };
 
 use crate::{
-    driver::{DeviceInfo, InputMapper, KeyMapping, MogaConnection, MogaDriver},
+    driver::{
+        DeviceInfo, InputMapper, KeyMapping, MogaConnection, MogaDriver, LEGACY_RFCOMM_FALLBACKS,
+    },
     protocol::MogaState,
     AppState,
 };
@@ -74,6 +76,7 @@ impl<R: Runtime> MogaDriver for AndroidDriver<R> {
             "connect",
             ConnectPayload {
                 device_id: device_id.to_string(),
+                strategies: &LEGACY_RFCOMM_FALLBACKS,
             },
         )?;
         Ok(Box::new(AndroidConnection {
@@ -110,6 +113,7 @@ impl<R: Runtime> InputMapper for AndroidDriver<R> {
 #[serde(rename_all = "camelCase")]
 struct ConnectPayload {
     device_id: String,
+    strategies: &'static [crate::driver::RfcommStrategy],
 }
 
 #[derive(Serialize)]

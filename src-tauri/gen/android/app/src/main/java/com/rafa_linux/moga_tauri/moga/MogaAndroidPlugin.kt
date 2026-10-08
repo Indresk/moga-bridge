@@ -5,6 +5,7 @@ import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothSocket
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -14,6 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
 import android.provider.Settings
+import android.util.Log
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.Permission
@@ -31,6 +33,7 @@ import java.util.concurrent.TimeUnit
 @InvokeArg
 internal class ConnectArgs {
     lateinit var deviceId: String
+    lateinit var strategies: List<String>
 }
 
 @InvokeArg
@@ -196,20 +199,22 @@ class MogaAndroidPlugin(private val activity: Activity) : Plugin(activity) {
                     val device = adapter.getRemoteDevice(args.deviceId)
                     stopDeviceScanInternal()
                     ensureBonded(device, generation)
-                    val newSocket = device.createRfcommSocketToServiceRecord(SPP_UUID)
                     synchronized(connectionLock) {
                         if (connectionGeneration != generation) {
                             throw IOException("The Bluetooth connection was cancelled.")
                         }
-                        pendingSocket = newSocket
                     }
-                    newSocket.connect()
+                    val newSocket = connectWithLegacyFallbacks(
+                        adapter,
+                        device,
+                        generation,
+                        args.strategies,
+                    )
 
                     synchronized(connectionLock) {
-                        if (connectionGeneration != generation || pendingSocket !== newSocket) {
+                        if (connectionGeneration != generation) {
                             throw IOException("The Bluetooth connection was cancelled.")
                         }
-                        pendingSocket = null
                         socket = newSocket
                         connected = true
                         connectionError = null
@@ -346,14 +351,24 @@ class MogaAndroidPlugin(private val activity: Activity) : Plugin(activity) {
                     BluetoothDevice.ACTION_FOUND -> {
                         val device = intent.bluetoothDevice() ?: return
                         if (device.bondState == BluetoothDevice.BOND_BONDED) return
-                        if (isMogaDevice(device)) {
+                        // device.name is often still null at FOUND time; the legacy app relied on
+                        // the inquiry name, which Android delivers in EXTRA_NAME.
+                        val name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME)
+                        if (isMogaName(name) || isMogaDevice(device)) {
                             rememberDiscoveredDevice(adapter, device)
-                        } else {
-                            try {
-                                device.fetchUuidsWithSdp()
-                            } catch (_: SecurityException) {
-                                connectionError = "Bluetooth permission was revoked during discovery."
-                            }
+                        }
+                        // Deliberately no fetchUuidsWithSdp() here: SDP traffic during inquiry
+                        // slows discovery and can make the Pocket drop out. The legacy app
+                        // matched by name only.
+                    }
+                    BluetoothDevice.ACTION_NAME_CHANGED -> {
+                        val device = intent.bluetoothDevice() ?: return
+                        val name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME)
+                        if (
+                            device.bondState != BluetoothDevice.BOND_BONDED &&
+                            (isMogaName(name) || isMogaDevice(device))
+                        ) {
+                            rememberDiscoveredDevice(adapter, device)
                         }
                     }
                     BluetoothDevice.ACTION_UUID -> {
@@ -426,6 +441,7 @@ class MogaAndroidPlugin(private val activity: Activity) : Plugin(activity) {
     private fun discoveryFilter(): IntentFilter {
         return IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothDevice.ACTION_NAME_CHANGED)
             addAction(BluetoothDevice.ACTION_UUID)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
         }
@@ -539,7 +555,145 @@ class MogaAndroidPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     private fun isMogaDevice(device: BluetoothDevice): Boolean {
-        return device.name?.contains("MOGA", ignoreCase = true) == true
+        return try {
+            isMogaName(device.name)
+        } catch (_: SecurityException) {
+            false
+        }
+    }
+
+    /**
+     * Mode A names: Pocket advertises "BD&A" (legacy app: exact match; moga-uinput: prefix
+     * "BD&A"/"BDA"), Pro/Pro Power advertise "Moga Pro"/"MOGA ...". "HID" names are Mode B
+     * (standard HID) and must not be driven through this proprietary protocol.
+     */
+    private fun isMogaName(name: String?): Boolean {
+        val upper = name?.trim()?.uppercase() ?: return false
+        if ("HID" in upper) return false
+        return upper.startsWith("BD&A") || upper.startsWith("BDA") || upper.startsWith("MOGA")
+    }
+
+    private fun connectWithLegacyFallbacks(
+        adapter: BluetoothAdapter,
+        device: BluetoothDevice,
+        generation: Int,
+        strategies: List<String>,
+    ): BluetoothSocket {
+        adapter.cancelDiscovery()
+        val failures = mutableListOf<String>()
+
+        // The legacy app waited (CONNECTION_DELAY_MS = 2000) and looped with a 500 ms pause:
+        // the Pocket often refuses the first RFCOMM connect right after bonding/inquiry.
+        Thread.sleep(POST_BOND_SETTLE_MILLIS)
+        for (round in 1..CONNECT_ROUNDS) {
+            for (strategy in strategies) {
+            if (connectionGeneration != generation) {
+                throw IOException("The Bluetooth connection was cancelled.")
+            }
+
+            val candidate = try {
+                createSocket(device, strategy)
+            } catch (error: Exception) {
+                Log.w(TAG, "RFCOMM strategy=$strategy unavailable: ${error.message}")
+                failures += "$strategy: ${error.message ?: error.javaClass.simpleName}"
+                continue
+            }
+
+            synchronized(connectionLock) {
+                if (connectionGeneration != generation) {
+                    try {
+                        candidate.close()
+                    } catch (_: IOException) {
+                        Unit
+                    }
+                    throw IOException("The Bluetooth connection was cancelled.")
+                }
+                pendingSocket = candidate
+            }
+
+            try {
+                candidate.connect()
+                if (connectionGeneration != generation) {
+                    candidate.close()
+                    throw IOException("The Bluetooth connection was cancelled.")
+                }
+                Log.i(TAG, "RFCOMM connected with strategy=$strategy (round $round/$CONNECT_ROUNDS)")
+                return candidate
+            } catch (error: Exception) {
+                synchronized(connectionLock) {
+                    if (pendingSocket === candidate) pendingSocket = null
+                }
+                try {
+                    candidate.close()
+                } catch (_: IOException) {
+                    Unit
+                }
+                if (connectionGeneration != generation) {
+                    throw IOException("The Bluetooth connection was cancelled.", error)
+                }
+                Log.w(TAG, "RFCOMM strategy=$strategy failed (round $round): ${error.message}")
+                failures += "$strategy: ${error.message ?: error.javaClass.simpleName}"
+            }
+            }
+            if (round < CONNECT_ROUNDS) Thread.sleep(RECONNECT_DELAY_MILLIS)
+        }
+
+        throw IOException(
+            "All legacy MOGA RFCOMM connection methods failed. ${failures.joinToString(" | ")}",
+        )
+    }
+
+    private fun createSocket(device: BluetoothDevice, strategy: String): BluetoothSocket {
+        return when (strategy) {
+            "reflectedSocketConstructor" -> createLegacySocket(device)
+            "reflectedChannelOne" -> createChannelOneSocket(device)
+            "reflectedInsecureChannelOne" -> createInsecureChannelOneSocket(device)
+            "publicInsecureSpp" -> device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
+            "publicSecureSpp" -> device.createRfcommSocketToServiceRecord(SPP_UUID)
+            else -> throw IllegalArgumentException("Unsupported RFCOMM strategy: $strategy")
+        }
+    }
+
+    private fun createLegacySocket(device: BluetoothDevice): BluetoothSocket {
+        val intType = Int::class.javaPrimitiveType
+            ?: throw NoSuchMethodException("Primitive int class is unavailable.")
+        val boolType = Boolean::class.javaPrimitiveType
+            ?: throw NoSuchMethodException("Primitive boolean class is unavailable.")
+        val socketType = BluetoothSocket::class.java.getDeclaredField("TYPE_RFCOMM")
+            .apply { isAccessible = true }
+            .getInt(null)
+        val constructor = BluetoothSocket::class.java.getDeclaredConstructor(
+            intType,
+            intType,
+            boolType,
+            boolType,
+            BluetoothDevice::class.java,
+            intType,
+            ParcelUuid::class.java,
+        ).apply { isAccessible = true }
+        return constructor.newInstance(
+            socketType,
+            -1,
+            false,
+            true,
+            device,
+            -1,
+            ParcelUuid(SPP_UUID),
+        ) as BluetoothSocket
+    }
+
+    private fun createChannelOneSocket(device: BluetoothDevice): BluetoothSocket {
+        val portType = Int::class.javaPrimitiveType
+            ?: throw NoSuchMethodException("Primitive int class is unavailable.")
+        val method = BluetoothDevice::class.java.getMethod("createRfcommSocket", portType)
+        return method.invoke(device, 1) as BluetoothSocket
+    }
+
+    private fun createInsecureChannelOneSocket(device: BluetoothDevice): BluetoothSocket {
+        val portType = Int::class.javaPrimitiveType
+            ?: throw NoSuchMethodException("Primitive int class is unavailable.")
+        val method = BluetoothDevice::class.java.getMethod("createInsecureRfcommSocket", portType)
+        return method.invoke(device, 1) as BluetoothSocket
     }
 
     private fun deviceInfo(device: BluetoothDevice, bonded: Boolean): Map<String, Any> {
@@ -654,8 +808,12 @@ class MogaAndroidPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     companion object {
+        private const val TAG = "MogaRfcomm"
         private const val PREFERENCES = "moga-key-mapping"
         private const val BOND_TIMEOUT_SECONDS = 90L
+        private const val POST_BOND_SETTLE_MILLIS = 2_000L
+        private const val RECONNECT_DELAY_MILLIS = 500L
+        private const val CONNECT_ROUNDS = 3
         private const val UUID_LOOKUP_GRACE_MILLIS = 5_000L
         private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
         private val MAPPING_CONTROLS = listOf(

@@ -15,10 +15,31 @@ pub struct DeviceInfo {
     pub bonded: bool,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg(target_os = "android")]
+pub enum RfcommStrategy {
+    ReflectedSocketConstructor,
+    ReflectedChannelOne,
+    ReflectedInsecureChannelOne,
+    PublicInsecureSpp,
+    PublicSecureSpp,
+}
+
+#[cfg(target_os = "android")]
+pub const LEGACY_RFCOMM_FALLBACKS: [RfcommStrategy; 5] = [
+    RfcommStrategy::ReflectedSocketConstructor,
+    RfcommStrategy::ReflectedChannelOne,
+    RfcommStrategy::ReflectedInsecureChannelOne,
+    RfcommStrategy::PublicInsecureSpp,
+    RfcommStrategy::PublicSecureSpp,
+];
+
 pub trait MogaDriver: InputMapper + Send + Sync + 'static {
     fn scan(&self) -> Result<Vec<DeviceInfo>, String>;
     fn scan_unpaired(&self) -> Result<(), String>;
     fn stop_scan(&self) -> Result<(), String>;
+    /// Connect after pairing, trying each legacy-compatible socket strategy in order.
     fn connect(&self, device_id: &str) -> Result<Box<dyn MogaConnection>, String>;
     fn disconnect(&self) -> Result<(), String>;
 }
