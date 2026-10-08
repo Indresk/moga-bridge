@@ -42,7 +42,7 @@ class MogaInputMethodService : InputMethodService() {
     }
 
     private fun acceptState(state: JSONObject) {
-        val preferences = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
+        val preferences = MogaPreferences(this)
         val buttons = state.optJSONObject("buttons") ?: JSONObject()
         val leftStick = state.optJSONObject("leftStick") ?: JSONObject()
         val rightStick = state.optJSONObject("rightStick") ?: JSONObject()
@@ -68,7 +68,7 @@ class MogaInputMethodService : InputMethodService() {
             .filterValues { it }
             .keys
             .mapNotNull { control ->
-                preferences.getInt(control, 0).takeIf { it != 0 }
+                preferences.keyCode(control).takeIf { it != 0 }
             }
             .toSet()
 
@@ -77,7 +77,6 @@ class MogaInputMethodService : InputMethodService() {
     }
 
     companion object {
-        private const val PREFERENCES = "moga-key-mapping"
         @Volatile private var activeService: WeakReference<MogaInputMethodService>? = null
 
         fun dispatch(state: JSONObject): Boolean {

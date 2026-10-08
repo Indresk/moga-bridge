@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Button from "./Button";
+import { openBatterySettings } from "../lib/api";
 import CopyField from "./CopyField";
 import Panel from "./Panel";
 import StatusTag from "./StatusTag";
@@ -53,9 +54,18 @@ export default function HelperPanel({ reachable, command }) {
           Todo en orden: ya se puede usar el gamepad virtual con sticks analógicos en cualquier
           juego o emulador.
         </p>
-        <Button variant="secondary" onClick={() => setShowInfo((value) => !value)}>
-          {showInfo ? "Ocultar información" : "Ver información"}
-        </Button>
+        <div className="button-row">
+          <Button variant="secondary" onClick={() => setShowInfo((value) => !value)}>
+            {showInfo ? "Ocultar información" : "Ver información"}
+          </Button>
+          <Button variant="secondary" onClick={() => openBatterySettings().catch(console.error)}>
+            Ajustes de batería
+          </Button>
+        </div>
+        <p className="helper-text">
+          ¿El mando deja de responder al salir de la app? Algunos móviles limitan las apps en
+          segundo plano: deja MOGA Bridge en «Sin restricciones» en el ahorro de batería.
+        </p>
         {showInfo && (
           <>
             <WhatIsIt />

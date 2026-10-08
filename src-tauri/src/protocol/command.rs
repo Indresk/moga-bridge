@@ -37,7 +37,10 @@ mod tests {
             build_command(Command::SelectPlayer, 1),
             [0x5A, 0x05, 0x43, 0x01, 0x1D]
         );
-        assert_eq!(build_command(Command::Poll, 1), [0x5A, 0x05, 0x41, 0x01, 0x1F]);
+        assert_eq!(
+            build_command(Command::Poll, 1),
+            [0x5A, 0x05, 0x41, 0x01, 0x1F]
+        );
         assert_eq!(
             build_command(Command::Listen, 1),
             [0x5A, 0x05, 0x44, 0x01, 0x1A]

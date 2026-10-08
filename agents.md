@@ -5,7 +5,7 @@ This document records protocol and architecture facts that should be kept consis
 ## Scope and current state
 
 - Make project changes only in this `moga-tauri/` tree. The sibling `decompilado-moga-universal/` and `moga-uinput/` directories are read-only protocol references.
-- Android's paired-device enumeration and RFCOMM socket are implemented in `gen/android/app/src/main/java/dev/mogabridge/app/moga/MogaAndroidPlugin.kt`; the IME is `MogaInputMethodService.kt`; the virtual gamepad bridge is `UinputBridge.kt`; the connection notification is `MogaConnectionService.kt`.
+- The Kotlin side lives in `gen/android/app/src/main/java/dev/mogabridge/app/moga/` (preserve it if the Android project is regenerated). One class per responsibility: `MogaAndroidPlugin` (Tauri commands and wiring only), `MogaPreferences` (all settings), `MogaDevices` (name filter + Bluetooth helpers), `DeviceDiscovery` (inquiry), `DeviceBonding` (`createBond`), `RfcommSockets` + `RfcommConnector` (socket strategies and retries), `ControllerLink` (open link, reader thread, queue), `UinputBridge` + `HelperFiles` (virtual gamepad), `MogaInputMethodService` (keyboard output), `MogaConnectionService` (notification). Their command names must match `drivers/android.rs`.
 
 ## Architecture
 
@@ -121,7 +121,7 @@ Keep transport, parser, and input-output mapping separate. Future Windows and Li
 
 See [develop.md](./develop.md) for commands. Facts that cost time before:
 
-- The plugin is registered at runtime, so Tauri's ACL does not know it. `build.rs` must declare it with `InlinedPlugin` (commands `registerListener`, `removeListener`) and `capabilities/default.json` must grant `moga-android:default`; otherwise `addPluginListener` fails with `moga-android.registerListener not allowed. Plugin not found`. If you add Kotlin commands invoked **from JS**, add them there too (commands invoked from Rust via `run_mobile_plugin` do not need it).
+- The plugin is registered at runtime, so Tauri's ACL does not know it. `build.rs` must declare it with `InlinedPlugin` (commands `registerListener` and `remove_listener`: the JS API calls them with those exact spellings) and `capabilities/default.json` must grant `moga-android:default`; otherwise `addPluginListener` fails with `moga-android.registerListener not allowed. Plugin not found`. If you add Kotlin commands invoked **from JS**, add them there too (commands invoked from Rust via `run_mobile_plugin` do not need it).
 - `ERR_CONNECTION_REFUSED` on `http://tauri.localhost/` in dev means the phone cannot reach Vite, not that the app is a release build. The LAN IP is usually firewalled; use `pnpm android:dev` (`adb reverse` + `--host 127.0.0.1`).
 - `build.rs`/capability/Kotlin changes are not always picked up by the running dev watcher; restart `pnpm android:dev`.
 - Never use `pkill -f "tauri android dev"` from an agent shell: it matches its own command line. Kill by PID.

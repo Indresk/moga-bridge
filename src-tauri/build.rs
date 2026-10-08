@@ -6,7 +6,7 @@ fn main() {
         tauri_build::Attributes::new().plugin(
             "moga-android",
             tauri_build::InlinedPlugin::new()
-                .commands(&["registerListener", "removeListener"])
+                .commands(&["registerListener", "remove_listener"])
                 .default_permission(tauri_build::DefaultPermissionRule::AllowAllCommands),
         ),
     )

@@ -14,7 +14,10 @@ pub enum ConnectionState {
 impl ConnectionState {
     /// A connection attempt or session is in progress and must not be restarted.
     pub fn is_active(self) -> bool {
-        matches!(self, Self::Connecting | Self::Connected | Self::Disconnecting)
+        matches!(
+            self,
+            Self::Connecting | Self::Connected | Self::Disconnecting
+        )
     }
 }
 
@@ -31,11 +34,7 @@ impl ConnectionStatus {
         Self::new(ConnectionState::Idle, None, None)
     }
 
-    pub fn new(
-        state: ConnectionState,
-        device_id: Option<String>,
-        message: Option<String>,
-    ) -> Self {
+    pub fn new(state: ConnectionState, device_id: Option<String>, message: Option<String>) -> Self {
         Self {
             state,
             device_id,

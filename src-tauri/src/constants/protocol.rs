@@ -1,9 +1,5 @@
 //! MOGA Mode A wire protocol numbers (see `readme.md` and the decompiled `BluetoothThread`).
 
-/// Bluetooth Serial Port Profile UUID used by the legacy app.
-#[allow(dead_code)]
-pub const RFCOMM_SPP_UUID: &str = "00001101-0000-1000-8000-00805F9B34FB";
-
 /// First byte of every message we send to the controller.
 pub const COMMAND_MARKER: u8 = 0x5A;
 /// Outgoing messages are always `[marker, len, command, player, xor]`.

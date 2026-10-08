@@ -53,11 +53,35 @@ This checklist reflects the current implementation: a Rust protocol parser/drive
 - [ ] Battery level: no known source (see agents.md); inspect the raw report across battery states.
 - [ ] Support the MOGA Pro layout (D-pad, triggers, stick clicks).
 
+## Legacy app review: features we do not have yet
+
+Findings from reading `decompilado-moga-universal` (not implemented; candidates, roughly by value):
+
+- [ ] **Remember the last controller and auto-reconnect.** The legacy `BluetoothThread` stores the device (`PREF_DEVICE_ADDR/NAME/TYPE`) and, when the link drops, reconnects on its own (state `RECONNECTING`, 500 ms pause) instead of asking the user. Ours returns to the Connection tab and needs a manual tap. This pairs with the controller's idle power-off: turning the pad back on could reconnect it automatically.
+- [ ] **Named profiles.** `ProfileManager` / `XProfile` (XML): create, rename, delete and select profiles, separate per driver mode (keyboard/gamepad) and per device type (Pocket/Pro); `SwitchProfileActivity` switches quickly. Ours has one global mapping and one stick layout.
+- [ ] **Per-input analog/digital choice.** Its profile editor has "Enable Analog Input" for left stick, right stick, triggers and D-pad, and per-button remapping ("Change"). Our stick-layout switch is a first step; a full per-input remap would generalise it.
+- [ ] **Quick toggle widgets.** `ServiceToggleWidget` / `ServiceToggleWidgetLong` start and stop the service from the home screen (with on/off icons). We only have the notification's Disconnect action.
+- [ ] **Manage devices screen.** `ManageDevicesFragment`: list paired controllers, choose the active one, and unpair (`removeBond` via reflection). We can only connect; there is no "forget this controller".
+- [ ] **Conflict detection with the official MOGA apps.** `PivotUtil` / `KillPivotTask` detect the MOGA Pivot/Controller services (`com.bda.pivot`, `com.bda.controller.service`, …) holding the controller and guide the user to stop them (it used root `am force-stop`; without root it opens the app's settings page). Worth a warning in the Connection tab.
+- [ ] **Keep-alive ping.** The legacy thread writes the listen command every 5 minutes (`PING_DELAY_MS = 300000`). It may or may not prevent the controller's idle power-off; worth testing, since we only send it before each read.
+- [ ] **Bad-packet threshold and error log.** It stops after 1000 bad packets (`BAD_PACKET_THRESHOLD`) and `ErrorLogger` writes errors to a file. We drop bad packets silently apart from the UI message; a bounded in-app log and a "share log" action would help support.
+- [ ] **MOGA Pro layout.** `MOGAProState`: D-pad bits, L/R trigger buttons (`0x10`/`0x20`), stick clicks (`0x40`/`0x80`) in byte 5, plus the same four axes. Only the Pocket layout is implemented (see the compatibility disclaimer).
+- [ ] **Complete key catalog for keyboard mode.** `KeyboardLetters`, `KeyboardSpecialKeys`, `KeyboardSymbols` and `KeyboardGamepadButtons` expose far more keys than our letters/digits/arrows list, including gamepad key codes.
+- [ ] **IME picker shortcut.** The legacy home screen has "Configure Virtual Keyboards" and "Select Virtual Keyboard" actions; we only open the keyboard settings (no `showInputMethodPicker()` shortcut).
+- [ ] **Touch output.** `TouchOutput` exists in the legacy code but is an empty stub; screen-touch emulation was planned and never built.
+- [ ] **Mode selection dialog / first-run guidance.** `SelectModeDialogFragment` explains each driver mode up front (keyboard = no root but no analogs; gamepad = root). Our Mapeo tab covers this, but there is no first-run walkthrough.
+- Not worth copying: AdMob ads and `show_ads`, root-only paths (`SystemOutput` chowns `/dev/uinput` with RootTools; our adb helper replaces it without root).
+
+## Investigations
+
+- [ ] **Virtual gamepad occasionally stops being detected after leaving the app** (fixed by returning to the app for a moment). Not reproduced; root cause unconfirmed. Found and fixed: the bridge never read from its socket, so a dropped helper connection (which removes the device) went unnoticed until the next write, and it only reconnected on the next controller report. Now it reads for EOF, a 2 s watchdog rebuilds the device and replays the last state, it re-checks on resume, and every transition is logged under tag `MogaUinput`. Next occurrence: capture `adb logcat -d -s MogaUinput MogaRfcomm MogaConnection`. Another suspect on Xiaomi/HyperOS is background restriction of the app; the Mapeo tab now links to the battery settings.
+
 ## Architecture
 
 - [x] Rust backend split into `constants`, `utils`, `schemas`, `protocol`, `drivers`, `services`, `commands`.
 - [x] Frontend split into `lib` (api), `hooks`, `components`, `views`, `styles`; legacy-app palette and assets.
-- [ ] Split `MogaAndroidPlugin.kt` (discovery, RFCOMM connector, output settings) into smaller classes.
+- [x] Split `MogaAndroidPlugin.kt` into preferences, device filter, discovery, bonding, socket strategies/connector and controller link; the plugin is now only commands and wiring.
+- [x] Review pass: clippy/fmt clean, dead constants and the unused plugin wrapper removed, `ProtocolError` variants renamed, the IME now honours the default key mapping.
 - [ ] Frontend tests (hooks and components).
 
 ## Android no-root input destination

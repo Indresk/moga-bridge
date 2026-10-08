@@ -2,6 +2,10 @@
 
 How to run the Android dev loop, build an APK, read logs, and fix the usual problems. Protocol and architecture details live in [readme.md](./readme.md) and [agents.md](./agents.md).
 
+## Project layout
+
+See [agents.md](./agents.md#architecture) for the layers (Rust backend, React frontend, Kotlin plugin) and where to add a command, a screen or a setting.
+
 ## Prerequisites
 
 - Rust stable with the Android targets: `rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android`

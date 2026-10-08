@@ -8,6 +8,8 @@ import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -30,7 +32,7 @@ internal class UinputBridge(
     private val port: Int = DEFAULT_PORT,
     private val tokenProvider: () -> String? = { null },
 ) {
-    private val executor = Executors.newSingleThreadExecutor { runnable ->
+    private val executor = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "moga-uinput").apply { isDaemon = true }
     }
     private val pendingState = AtomicReference<JSONObject?>(null)
@@ -40,14 +42,53 @@ internal class UinputBridge(
     private var output: OutputStream? = null
     private var lastValues = HashMap<Int, Int>()
     private var nextAttemptAtMillis = 0L
+    private var watchdog: ScheduledFuture<*>? = null
+
+    /** The state to replay after reconnecting, so the device comes back exactly as it was. */
+    private var lastState: JSONObject = NEUTRAL_STATE
 
     @Volatile var lastError: String? = null
         private set
 
     @Volatile private var suspended = false
 
-    /** `analogs`, `leftDpad` or `rightDpad`; see [STICK_LAYOUT_ANALOGS] and friends. */
-    @Volatile var stickLayout: String = STICK_LAYOUT_ANALOGS
+    /** True while a controller is connected and the virtual gamepad is the selected output. */
+    @Volatile private var active = false
+
+    /** `analogs`, `leftDpad` or `rightDpad`; see [StickLayouts]. */
+    @Volatile var stickLayout: String = StickLayouts.ANALOGS
+
+    /**
+     * Turn the virtual gamepad on or off. While active, a watchdog keeps the helper connection
+     * (and so the virtual device) alive: it is rebuilt on its own if it drops, instead of
+     * waiting for the next controller report.
+     */
+    fun setActive(value: Boolean) {
+        if (active == value) return
+        active = value
+        executor.execute {
+            if (value) {
+                watchdog = executor.scheduleWithFixedDelay(
+                    { maintain("watchdog") },
+                    WATCHDOG_MS,
+                    WATCHDOG_MS,
+                    TimeUnit.MILLISECONDS,
+                )
+                maintain("activated")
+            } else {
+                watchdog?.cancel(false)
+                watchdog = null
+                pendingState.set(null)
+                lastState = NEUTRAL_STATE
+                closeSocket("deactivated")
+            }
+        }
+    }
+
+    /** Re-check the connection now (e.g. when the app returns to the foreground). */
+    fun kick(reason: String) {
+        if (active) executor.execute { maintain(reason) }
+    }
 
     /**
      * While suspended nothing reaches Android; held buttons and sticks are released once so
@@ -56,37 +97,29 @@ internal class UinputBridge(
     fun setSuspended(value: Boolean) {
         if (suspended == value) return
         suspended = value
+        Log.i(TAG, "Virtual gamepad ${if (value) "suspended" else "resumed"}")
         if (value) {
             pendingState.set(null)
             executor.execute {
-                try {
-                    send(NEUTRAL_STATE)
-                } catch (error: IOException) {
-                    fail("Virtual gamepad helper write failed: ${error.message}")
-                }
+                lastState = NEUTRAL_STATE
+                guardedSend(NEUTRAL_STATE)
             }
         }
     }
 
     /** Queue the newest controller state; older queued states are dropped. */
     fun dispatch(state: JSONObject) {
-        if (suspended) return
+        if (suspended || !active) return
         pendingState.set(state)
         executor.execute {
             val latest = pendingState.getAndSet(null) ?: return@execute
-            try {
-                send(latest)
-            } catch (error: IOException) {
-                fail("Virtual gamepad helper write failed: ${error.message}")
-            }
+            lastState = latest
+            guardedSend(latest)
         }
     }
 
-    /** Remove the virtual device (e.g. when the controller disconnects). */
-    fun release() {
-        pendingState.set(null)
-        executor.execute { closeSocket() }
-    }
+    /** Stop the virtual gamepad and remove its device (e.g. when the controller disconnects). */
+    fun release() = setActive(false)
 
     /** True when the adb-started helper accepts connections on the loopback port. */
     fun isHelperReachable(): Boolean {
@@ -103,6 +136,20 @@ internal class UinputBridge(
             result.get()
         } catch (error: Exception) {
             false
+        }
+    }
+
+    /** Make sure the device exists; replay the last state if it had to be rebuilt. */
+    private fun maintain(reason: String) {
+        if (!active || socket != null) return
+        if (ensureConnected(reason)) guardedSend(lastState)
+    }
+
+    private fun guardedSend(state: JSONObject) {
+        try {
+            send(state)
+        } catch (error: IOException) {
+            fail("Virtual gamepad helper write failed: ${error.message}")
         }
     }
 
@@ -127,8 +174,8 @@ internal class UinputBridge(
         // A stick turned into a D-pad stops driving its analog axes and feeds the hat from
         // the controller's own digitised direction bits.
         val layout = stickLayout
-        val leftIsDpad = layout == STICK_LAYOUT_LEFT_DPAD
-        val rightIsDpad = layout == STICK_LAYOUT_RIGHT_DPAD
+        val leftIsDpad = layout == StickLayouts.LEFT_DPAD
+        val rightIsDpad = layout == StickLayouts.RIGHT_DPAD
         val axes = linkedMapOf(
             ABS_X to (if (leftIsDpad) 0 else leftStick.optInt("x")),
             ABS_Y to (if (leftIsDpad) 0 else leftStick.optInt("y")),
@@ -164,7 +211,7 @@ internal class UinputBridge(
         writeLine(JSONObject().put("id", DEVICE_ID).put("command", "inject").put("events", events))
     }
 
-    private fun ensureConnected(): Boolean {
+    private fun ensureConnected(reason: String = "report"): Boolean {
         if (socket != null) return true
         val now = System.currentTimeMillis()
         if (now < nextAttemptAtMillis) return false
@@ -180,7 +227,8 @@ internal class UinputBridge(
             output!!.write((token + "\n").toByteArray(Charsets.UTF_8))
             writeLine(registerCommand())
             lastError = null
-            Log.i(TAG, "Virtual gamepad registered through uinput helper on port $port")
+            Log.i(TAG, "Virtual gamepad registered through uinput helper on port $port ($reason)")
+            watchForClose(candidate)
             return true
         } catch (error: IOException) {
             fail(
@@ -254,14 +302,40 @@ internal class UinputBridge(
         events.put(type).put(code).put(value)
     }
 
+    /**
+     * The helper never writes back unless something went wrong, so a read returning means the
+     * connection ended (the virtual device is gone) or `uinput` printed an error. Either way
+     * we find out immediately instead of at the next write.
+     */
+    private fun watchForClose(candidate: Socket) {
+        Thread(
+            {
+                try {
+                    val reader = candidate.getInputStream().bufferedReader()
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        Log.w(TAG, "uinput helper said: $line")
+                    }
+                } catch (_: IOException) {
+                    Unit
+                }
+                executor.execute {
+                    if (socket === candidate) fail("The uinput helper closed the connection")
+                }
+            },
+            "moga-uinput-watch",
+        ).apply { isDaemon = true }.start()
+    }
+
     private fun fail(message: String) {
         lastError = message
         Log.w(TAG, message)
-        closeSocket()
+        closeSocket("failed")
         nextAttemptAtMillis = System.currentTimeMillis() + RETRY_DELAY_MS
     }
 
-    private fun closeSocket() {
+    private fun closeSocket(reason: String) {
+        if (socket != null) Log.i(TAG, "Virtual gamepad connection closed ($reason)")
         try {
             socket?.close()
         } catch (_: IOException) {
@@ -279,7 +353,8 @@ internal class UinputBridge(
         private const val TAG = "MogaUinput"
         private const val LOOPBACK = "127.0.0.1"
         private const val CONNECT_TIMEOUT_MS = 300
-        private const val RETRY_DELAY_MS = 2_000L
+        private const val RETRY_DELAY_MS = 1_000L
+        private const val WATCHDOG_MS = 2_000L
         private const val DEVICE_ID = 1
 
         // PowerA vendor id; the product id is arbitrary for a virtual device.
@@ -304,9 +379,6 @@ internal class UinputBridge(
         private val STICK_AXES = listOf(ABS_X, ABS_Y, ABS_RX, ABS_RY)
         private val HAT_AXES = listOf(ABS_HAT0X, ABS_HAT0Y)
 
-        const val STICK_LAYOUT_ANALOGS = "analogs"
-        const val STICK_LAYOUT_LEFT_DPAD = "leftDpad"
-        const val STICK_LAYOUT_RIGHT_DPAD = "rightDpad"
         private const val AXIS_RANGE = 127
         private const val AXIS_FLAT = 8
 

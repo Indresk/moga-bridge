@@ -13,11 +13,6 @@ mod utils;
 
 use services::AppState;
 
-#[cfg(target_os = "android")]
-mod android_plugin {
-    pub use crate::drivers::android::init;
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -38,10 +33,11 @@ pub fn run() {
             commands::settings::set_stick_layout,
             commands::settings::set_input_isolated,
             commands::settings::open_ime_settings,
+            commands::settings::open_battery_settings,
         ]);
 
     #[cfg(target_os = "android")]
-    let builder = builder.plugin(android_plugin::init());
+    let builder = builder.plugin(drivers::android::init());
 
     builder
         .run(tauri::generate_context!())

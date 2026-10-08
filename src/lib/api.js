@@ -22,6 +22,7 @@ export const getConnectionStatus = () => invoke("connection_status");
 export const getKeyMapping = () => invoke("get_key_mapping");
 export const saveKeyMapping = (mapping) => invoke("set_key_mapping", { mapping });
 export const openImeSettings = () => invoke("open_ime_settings");
+export const openBatterySettings = () => invoke("open_battery_settings");
 
 export const getOutputSettings = () => invoke("get_output_settings");
 export const setOutputMode = (mode) => invoke("set_output_mode", { mode });

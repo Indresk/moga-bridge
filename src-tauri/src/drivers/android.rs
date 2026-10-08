@@ -107,6 +107,10 @@ impl<R: Runtime> InputMapper for AndroidDriver<R> {
         self.invoke::<()>("openImeSettings", ())
     }
 
+    fn open_battery_settings(&self) -> Result<(), String> {
+        self.invoke::<()>("openBatterySettings", ())
+    }
+
     fn get_output_settings(&self) -> Result<OutputSettings, String> {
         self.invoke("getOutputSettings", ())
     }

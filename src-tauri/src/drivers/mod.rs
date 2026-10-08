@@ -10,9 +10,7 @@ pub mod unsupported;
 use std::io::Read;
 
 use crate::constants::protocol::COMMAND_LEN;
-use crate::schemas::{
-    DeviceInfo, KeyMapping, MogaState, OutputMode, OutputSettings, StickLayout,
-};
+use crate::schemas::{DeviceInfo, KeyMapping, MogaState, OutputMode, OutputSettings, StickLayout};
 
 pub use unsupported::UnsupportedDriver;
 
@@ -61,6 +59,10 @@ pub trait InputMapper: Send + Sync + 'static {
     fn set_mapping(&self, mapping: &KeyMapping) -> Result<(), String>;
     fn request_bluetooth_permission(&self) -> Result<(), String>;
     fn open_ime_settings(&self) -> Result<(), String>;
+
+    fn open_battery_settings(&self) -> Result<(), String> {
+        Err(unsupported::ANDROID_ONLY.into())
+    }
 
     fn get_output_settings(&self) -> Result<OutputSettings, String> {
         Err(unsupported::ANDROID_ONLY.into())

@@ -1,26 +1,30 @@
-# MOGA Pocket Bridge
+# MOGA Bridge
 
-A cross-platform-ready Tauri v2 application for reading the legacy MOGA Pocket's proprietary Bluetooth serial reports. Android has active Classic discovery, user-confirmed bonding, RFCOMM transport, and a keyboard-mapping IME bridge; Rust owns protocol parsing and emits controller state to the Tauri frontend.
+A Tauri v2 (Rust + React) Android app that connects to a legacy **MOGA Pocket** in Mode A over its proprietary Bluetooth serial protocol and turns it into a standard gamepad for other apps, without root. Rust owns the protocol and the connection session; a Kotlin plugin owns Bluetooth, the virtual gamepad bridge and the notification. The visual identity is a homage to the original MOGA Universal app.
+
+Docs: [usuario.md](./usuario.md) (end-user guide) · [develop.md](./develop.md) (dev loop, builds, signing) · [agents.md](./agents.md) (architecture and protocol notes) · [todo.md](./todo.md) (backlog).
 
 ## Architecture
 
 ```text
-React UI
-  ├─ invoke(scan_moga / scan_unpaired_devices / connect_moga)
-  ├─ listen(moga-status / moga-state)
-  └─ addPluginListener(moga-android / moga-discovered-devices)
-             │ Tauri commands and events
-Rust MogaDriver abstraction
-  ├─ AndroidDriver → Tauri mobile PluginHandle/JNI → Kotlin RFCOMM plugin
-  ├─ PlatformDriver (desktop placeholder)
-  └─ MockDriver (test-only RFCOMM byte stream)
-             │ Read stream
-PacketStreamParser → validated 12-byte report → MogaState
-             ├─ Tauri moga-state event (future in-app game/emulator hook)
-             └─ Android plugin → active InputMethodService → keyboard strokes
+React (src/)   views → components → hooks → lib/api.js
+                 │ Tauri commands (invoke) and events (listen / plugin listener)
+Rust (src-tauri/src/)
+  commands → services (connection session) → drivers (platform boundary)
+                                              ├─ AndroidDriver → Tauri plugin handle / JNI → Kotlin plugin
+                                              ├─ UnsupportedDriver (desktop placeholder)
+                                              └─ MockDriver (tests)
+  protocol (commands, parser) · schemas (data shapes) · constants · utils
+                 │ read stream of 12-byte reports
+Kotlin plugin (gen/android/.../dev/mogabridge/app/moga/)
+  MogaAndroidPlugin (commands) → MogaPreferences, DeviceDiscovery, DeviceBonding,
+  RfcommConnector/RfcommSockets, ControllerLink, UinputBridge + HelperFiles,
+  MogaInputMethodService (keyboard fallback), MogaConnectionService (notification)
+                 │ default output
+Virtual gamepad: UinputBridge → loopback helper started with adb → Android's `uinput` → real gamepad
 ```
 
-The protocol decoder is platform-independent. Android's native plugin performs blocking Bluetooth reads on a Kotlin worker and exposes buffered reads/writes over the Tauri JNI plugin handle; Rust's MOGA worker performs the handshake and parsing. Desktop adapters can be added behind `MogaDriver`; the current `PlatformDriver` fails explicitly rather than pretending that desktop scanning or connecting succeeded.
+The protocol decoder is platform-independent. The Kotlin plugin performs the blocking Bluetooth reads on a worker thread and exposes buffered reads/writes to Rust; Rust's connection worker does the handshake and decoding and forwards every decoded state back to the platform for output. Desktop adapters can be added behind `MogaDriver`; `UnsupportedDriver` fails explicitly rather than pretending that desktop scanning or connecting succeeded.
 
 ## Hardware and pairing
 

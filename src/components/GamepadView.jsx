@@ -1,3 +1,4 @@
+import DpadView from "./DpadView";
 import StickView from "./StickView";
 
 function Key({ label, pressed, className = "" }) {
@@ -9,7 +10,7 @@ function Key({ label, pressed, className = "" }) {
 }
 
 /** Live picture of the controller: buttons light up, sticks show their analog position. */
-export default function GamepadView({ state, active }) {
+export default function GamepadView({ state, active, layout = "analogs" }) {
   const buttons = state?.buttons ?? {};
   return (
     <div className={`pad ${active ? "" : "pad-idle"}`} aria-label="Estado del mando">
@@ -22,14 +23,22 @@ export default function GamepadView({ state, active }) {
         <Key label="R" pressed={buttons.rightBumper} />
       </div>
       <div className="pad-body">
-        <StickView label="Stick izquierdo" stick={state?.leftStick} />
+        {layout === "leftDpad" ? (
+          <DpadView label="D-pad (stick izquierdo)" stick={state?.leftStick} />
+        ) : (
+          <StickView label="Stick izquierdo" stick={state?.leftStick} />
+        )}
         <div className="pad-face">
           <Key label="Y" pressed={buttons.y} className="up" />
           <Key label="X" pressed={buttons.x} className="left" />
           <Key label="B" pressed={buttons.b} className="right" />
           <Key label="A" pressed={buttons.a} className="down" />
         </div>
-        <StickView label="Stick derecho" stick={state?.rightStick} />
+        {layout === "rightDpad" ? (
+          <DpadView label="D-pad (stick derecho)" stick={state?.rightStick} />
+        ) : (
+          <StickView label="Stick derecho" stick={state?.rightStick} />
+        )}
       </div>
     </div>
   );

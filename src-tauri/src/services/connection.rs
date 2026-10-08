@@ -23,7 +23,11 @@ const IDLE_POWER_OFF_HINT: &str =
 pub type SharedStatus = Arc<Mutex<ConnectionStatus>>;
 
 /// Move to `Connecting` unless a session is already active.
-pub fn begin(connection: &Mutex<ConnectionStatus>, app: &AppHandle, device_id: &str) -> Result<(), String> {
+pub fn begin(
+    connection: &Mutex<ConnectionStatus>,
+    app: &AppHandle,
+    device_id: &str,
+) -> Result<(), String> {
     let mut status = connection
         .lock()
         .map_err(|error| format!("Could not update connection status: {error}"))?;
@@ -153,7 +157,10 @@ fn finish(
 
 /// Mark a requested disconnect: an active session becomes `Disconnecting` (the worker then
 /// reports `Disconnected`), otherwise it is already over.
-pub fn request_disconnect(connection: &Mutex<ConnectionStatus>, app: &AppHandle) -> Result<(), String> {
+pub fn request_disconnect(
+    connection: &Mutex<ConnectionStatus>,
+    app: &AppHandle,
+) -> Result<(), String> {
     let mut status = connection
         .lock()
         .map_err(|error| format!("Could not update connection status: {error}"))?;

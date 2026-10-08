@@ -132,10 +132,15 @@ mod tests {
 
     #[test]
     fn rejects_out_of_range_android_codes() {
-        let mut mapping = KeyMapping::default();
-        mapping.button_a = MAX_KEY_CODE + 1;
-        assert!(mapping.validate().is_err());
-        mapping.button_a = -1;
-        assert!(mapping.validate().is_err());
+        let too_high = KeyMapping {
+            button_a: MAX_KEY_CODE + 1,
+            ..KeyMapping::default()
+        };
+        assert!(too_high.validate().is_err());
+        let negative = KeyMapping {
+            button_a: -1,
+            ..KeyMapping::default()
+        };
+        assert!(negative.validate().is_err());
     }
 }

@@ -10,8 +10,14 @@ const hex = (bytes) =>
 export default function TestView({ controller, output, onOpenConnection }) {
   const { status, state } = controller;
   const connected = status.state === "connected";
-  const isGamepadMode = (output.settings?.mode ?? "gamepad") === "gamepad";
-  const { setIsolated } = output;
+  const { settings, refresh, setIsolated } = output;
+  // The picture follows what the virtual gamepad is actually presenting to Android.
+  const gamepadActive = settings?.mode === "gamepad" && Boolean(settings?.helperReachable);
+  const layout = gamepadActive ? (settings?.stickLayout ?? "analogs") : "analogs";
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   // Isolation is only meant for this screen: always release it when leaving.
   useEffect(() => () => setIsolated(false), [setIsolated]);
@@ -29,7 +35,7 @@ export default function TestView({ controller, output, onOpenConnection }) {
       }
     >
       {!connected && <p className="empty-state">Conecta un mando para ver su estado en vivo.</p>}
-      {isGamepadMode && (
+      {gamepadActive && (
         <Switch
           checked={Boolean(output.settings?.isolated)}
           onChange={setIsolated}
@@ -37,7 +43,7 @@ export default function TestView({ controller, output, onOpenConnection }) {
           hint="No envía nada al sistema, así que el mando no mueve esta app. Se desactiva solo al salir de esta pantalla o pasar a otra app."
         />
       )}
-      <GamepadView state={state} active={connected} />
+      <GamepadView state={state} active={connected} layout={layout} />
 
       <details>
         <summary>Datos en bruto</summary>

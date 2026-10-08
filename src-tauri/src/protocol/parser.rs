@@ -9,26 +9,29 @@ use crate::utils::signed_axis::decode_axis;
 /// Validates and decodes one 12-byte report.
 pub fn parse_report(bytes: &[u8]) -> Result<MogaState, ProtocolError> {
     if bytes.len() != REPORT_LEN {
-        return Err(ProtocolError::InvalidLength(
-            bytes.get(offset::LENGTH).copied().unwrap_or(bytes.len() as u8),
+        return Err(ProtocolError::Length(
+            bytes
+                .get(offset::LENGTH)
+                .copied()
+                .unwrap_or(bytes.len() as u8),
         ));
     }
     if bytes[offset::MARKER] != REPORT_MARKER {
-        return Err(ProtocolError::InvalidMarker(bytes[offset::MARKER]));
+        return Err(ProtocolError::Marker(bytes[offset::MARKER]));
     }
     if bytes[offset::LENGTH] as usize != REPORT_LEN {
-        return Err(ProtocolError::InvalidLength(bytes[offset::LENGTH]));
+        return Err(ProtocolError::Length(bytes[offset::LENGTH]));
     }
     let response_id = bytes[offset::RESPONSE_ID];
     if response_id != RESPONSE_POLL && response_id != RESPONSE_LISTEN {
-        return Err(ProtocolError::InvalidResponseId(response_id));
+        return Err(ProtocolError::ResponseId(response_id));
     }
     if bytes[offset::PLAYER] != PLAYER_ONE {
-        return Err(ProtocolError::InvalidPlayer(bytes[offset::PLAYER]));
+        return Err(ProtocolError::Player(bytes[offset::PLAYER]));
     }
     let expected = xor_checksum(&bytes[..REPORT_LEN - 1]);
     if bytes[REPORT_LEN - 1] != expected {
-        return Err(ProtocolError::InvalidChecksum {
+        return Err(ProtocolError::Checksum {
             expected,
             actual: bytes[REPORT_LEN - 1],
         });
@@ -152,7 +155,7 @@ mod tests {
         packet[11] ^= 0xFF;
         assert!(matches!(
             parse_report(&packet),
-            Err(ProtocolError::InvalidChecksum { .. })
+            Err(ProtocolError::Checksum { .. })
         ));
     }
 }

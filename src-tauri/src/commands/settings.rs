@@ -35,6 +35,11 @@ pub fn set_input_isolated(state: State<'_, AppState>, isolated: bool) -> Result<
 }
 
 #[tauri::command]
+pub fn open_battery_settings(state: State<'_, AppState>) -> Result<(), String> {
+    state.driver()?.open_battery_settings()
+}
+
+#[tauri::command]
 pub fn open_ime_settings(state: State<'_, AppState>) -> Result<(), String> {
     state.driver()?.open_ime_settings()
 }
