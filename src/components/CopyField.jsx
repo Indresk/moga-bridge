@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Button from "./Button";
 
 /** Selectable command with a copy button that confirms the copy (or explains the failure). */
 export default function CopyField({ value }) {
   const [feedback, setFeedback] = useState("");
+  const timer = useRef();
+
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   async function copy() {
     try {
@@ -12,7 +15,8 @@ export default function CopyField({ value }) {
     } catch {
       setFeedback("No se pudo copiar; mantén pulsado el comando para seleccionarlo");
     }
-    setTimeout(() => setFeedback(""), 2500);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setFeedback(""), 2500);
   }
 
   return (

@@ -15,8 +15,12 @@ class MogaInputMethodService : InputMethodService() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var previousKeyCodes = emptySet<Int>()
 
+    /** Key code per control, loaded once and refreshed when the mapping changes. */
+    private var keyCodes: Map<String, Int> = emptyMap()
+
     override fun onCreate() {
         super.onCreate()
+        keyCodes = MogaPreferences(this).keyMapping()
         activeService = WeakReference(this)
     }
 
@@ -42,7 +46,6 @@ class MogaInputMethodService : InputMethodService() {
     }
 
     private fun acceptState(state: JSONObject) {
-        val preferences = MogaPreferences(this)
         val buttons = state.optJSONObject("buttons") ?: JSONObject()
         val leftStick = state.optJSONObject("leftStick") ?: JSONObject()
         val rightStick = state.optJSONObject("rightStick") ?: JSONObject()
@@ -68,7 +71,7 @@ class MogaInputMethodService : InputMethodService() {
             .filterValues { it }
             .keys
             .mapNotNull { control ->
-                preferences.keyCode(control).takeIf { it != 0 }
+                keyCodes[control]?.takeIf { it != 0 }
             }
             .toSet()
 
@@ -88,6 +91,7 @@ class MogaInputMethodService : InputMethodService() {
         fun mappingChanged() {
             val service = activeService?.get() ?: return
             service.mainHandler.post {
+                service.keyCodes = MogaPreferences(service).keyMapping()
                 service.previousKeyCodes = emptySet()
             }
         }

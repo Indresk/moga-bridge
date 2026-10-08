@@ -18,6 +18,8 @@ export const stopDeviceScan = () => invoke("stop_device_scan");
 export const connectController = (deviceId) => invoke("connect_moga", { deviceId });
 export const disconnectController = () => invoke("disconnect_moga");
 export const getConnectionStatus = () => invoke("connection_status");
+/** Turn the live `moga-state` stream on/off; enabling resolves to the latest state (or null). */
+export const setStateStream = (enabled) => invoke("set_state_stream", { enabled });
 
 export const getKeyMapping = () => invoke("get_key_mapping");
 export const saveKeyMapping = (mapping) => invoke("set_key_mapping", { mapping });

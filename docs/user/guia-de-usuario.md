@@ -23,12 +23,12 @@ Esta guía es para quien instala el APK de **MOGA Bridge** y quiere usar el mand
 2. **Ajustes → Opciones de desarrollador →** activa **Depuración USB** (en algunos Xiaomi, también **Depuración USB (ajustes de seguridad)**).
 3. En el PC instala las **platform-tools de Android** (incluyen `adb`): descárgalas gratis de [developer.android.com/tools/releases/platform-tools](https://developer.android.com/tools/releases/platform-tools) y descomprímelas.
 4. Conecta el móvil por USB y acepta el aviso "¿Permitir depuración USB?".
-5. En MOGA Bridge abre la pestaña **Mapeo**. Verás "Puente al sistema no iniciado" y un comando como:
+5. En MOGA Bridge abre la pestaña **Mapeo**. El panel **Ayudante uinput** mostrará la etiqueta **NO INICIADO**, la explicación, estos mismos pasos y un comando como:
    ```
    adb shell sh /sdcard/Android/data/dev.mogabridge.app/files/helper.sh
    ```
-   Cópialo y ejecútalo en una terminal del PC (en la carpeta de platform-tools).
-6. Debe responder `started`. Pulsa **Comprobar** en la app: pasará a "Puente al sistema listo". Ya puedes desconectar el cable.
+   Pulsa **Copiar comando** y ejecútalo en una terminal del PC (en la carpeta de platform-tools).
+6. Debe responder `started`. La pantalla se actualiza sola en unos segundos: la etiqueta pasa a **ACTIVO** y la opción **Gamepad virtual** se habilita (mientras el ayudante no esté activo aparece desactivada). Ya puedes desconectar el cable.
 
 ## Paso 3: jugar
 
@@ -36,6 +36,10 @@ Esta guía es para quien instala el APK de **MOGA Bridge** y quiere usar el mand
 2. Si una app no reconoce algún botón, asígnalo en los ajustes de controles de esa app pulsando la acción y luego el botón del mando.
 3. **Distribución de sticks** (pestaña Mapeo): elige *Dos analógicos*, *Analógico derecho + D-pad* (el stick izquierdo hace de cruceta) o *Analógico izquierdo + D-pad* (el derecho hace de cruceta). Útil para juegos que esperan una cruceta.
 4. Para volver a MOGA Bridge y comprobar el mando sin que mueva la app, usa la pestaña **Prueba** y activa **Aislar el mando mientras pruebo**. Se desactiva solo al salir de esa pantalla o al cambiar de app.
+
+## Si no tienes un PC
+
+Sin el ayudante el modo **Gamepad virtual** no está disponible. Queda el modo **Teclado**, que solo escribe en campos de texto y no sirve para juegos. Estamos estudiando formas de iniciar el ayudante sin PC; mientras tanto necesitas un PC (o un amigo con uno) cada vez que reinicies el móvil.
 
 ## El mando se apaga solo
 
@@ -45,7 +49,9 @@ El MOGA tiene un temporizador interno: si pasa un rato sin recibir pulsaciones, 
 
 | Síntoma | Qué hacer |
 |---|---|
-| "Puente al sistema no iniciado" | Repite el comando del paso 2; tras reiniciar el móvil hay que hacerlo de nuevo. |
+| El panel **Ayudante uinput** dice **NO INICIADO** | Repite el comando del paso 2; tras reiniciar el móvil hay que hacerlo de nuevo. |
+| **Gamepad virtual** aparece desactivado | Necesita el ayudante activo; sigue los pasos del panel **Ayudante uinput**. |
+| El mando deja de responder al salir de la app | Algunos móviles (p. ej. Xiaomi) limitan las apps en segundo plano. En **Mapeo → Ajustes de batería** deja MOGA Bridge en «Sin restricciones». |
 | `Missing .../helper.token` | Abre MOGA Bridge una vez y vuelve a ejecutar el comando. |
 | `adb: no devices` | Revisa el cable, la depuración USB y el aviso de autorización en el móvil. |
 | El mando se conecta pero el juego no responde | Comprueba que **Aislar el mando** esté desactivado y que el modo sea **Gamepad virtual**. |

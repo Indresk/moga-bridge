@@ -8,6 +8,7 @@ import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -55,8 +56,19 @@ internal class UinputBridge(
     /** True while a controller is connected and the virtual gamepad is the selected output. */
     @Volatile private var active = false
 
-    /** `analogs`, `leftDpad` or `rightDpad`; see [StickLayouts]. */
+    /** The newest state reported by the controller, kept even while suspended or inactive. */
+    @Volatile private var latestReported: JSONObject = NEUTRAL_STATE
+
+    /**
+     * `analogs`, `leftDpad` or `rightDpad`; see [StickLayouts]. Changing it re-sends the current
+     * state, because identical controller reports are filtered out upstream and no new report
+     * may come for a while.
+     */
     @Volatile var stickLayout: String = StickLayouts.ANALOGS
+        set(value) {
+            field = value
+            resend()
+        }
 
     /**
      * Turn the virtual gamepad on or off. While active, a watchdog keeps the helper connection
@@ -87,7 +99,7 @@ internal class UinputBridge(
 
     /** Re-check the connection now (e.g. when the app returns to the foreground). */
     fun kick(reason: String) {
-        if (active) executor.execute { maintain(reason) }
+        if (active && !executor.isShutdown) executor.execute { maintain(reason) }
     }
 
     /**
@@ -104,12 +116,24 @@ internal class UinputBridge(
                 lastState = NEUTRAL_STATE
                 guardedSend(NEUTRAL_STATE)
             }
+        } else {
+            resend() // identical reports are filtered upstream: restore held inputs now
+        }
+    }
+
+    /** Send the state that should currently be visible to Android. */
+    private fun resend() {
+        if (!active || executor.isShutdown) return
+        executor.execute {
+            lastState = if (suspended) NEUTRAL_STATE else latestReported
+            guardedSend(lastState)
         }
     }
 
     /** Queue the newest controller state; older queued states are dropped. */
     fun dispatch(state: JSONObject) {
-        if (suspended || !active) return
+        latestReported = state
+        if (suspended || !active || executor.isShutdown) return
         pendingState.set(state)
         executor.execute {
             val latest = pendingState.getAndSet(null) ?: return@execute
@@ -120,6 +144,17 @@ internal class UinputBridge(
 
     /** Stop the virtual gamepad and remove its device (e.g. when the controller disconnects). */
     fun release() = setActive(false)
+
+    /** Final cleanup when the plugin is destroyed: drop the device and stop the worker thread. */
+    fun shutdown() {
+        active = false
+        executor.execute {
+            watchdog?.cancel(false)
+            watchdog = null
+            closeSocket("shutdown")
+        }
+        executor.shutdown()
+    }
 
     /** True when the adb-started helper accepts connections on the loopback port. */
     fun isHelperReachable(): Boolean {
@@ -133,8 +168,9 @@ internal class UinputBridge(
             }
         }
         return try {
-            result.get()
+            result.get(REACHABLE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         } catch (error: Exception) {
+            result.cancel(true)
             false
         }
     }
@@ -319,8 +355,12 @@ internal class UinputBridge(
                 } catch (_: IOException) {
                     Unit
                 }
-                executor.execute {
-                    if (socket === candidate) fail("The uinput helper closed the connection")
+                try {
+                    executor.execute {
+                        if (socket === candidate) fail("The uinput helper closed the connection")
+                    }
+                } catch (_: RejectedExecutionException) {
+                    Unit // the plugin was destroyed meanwhile
                 }
             },
             "moga-uinput-watch",
@@ -353,6 +393,7 @@ internal class UinputBridge(
         private const val TAG = "MogaUinput"
         private const val LOOPBACK = "127.0.0.1"
         private const val CONNECT_TIMEOUT_MS = 300
+        private const val REACHABLE_TIMEOUT_MS = 1_500L
         private const val RETRY_DELAY_MS = 1_000L
         private const val WATCHDOG_MS = 2_000L
         private const val DEVICE_ID = 1

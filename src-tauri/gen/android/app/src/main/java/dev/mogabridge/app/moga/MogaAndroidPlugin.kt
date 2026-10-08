@@ -88,6 +88,11 @@ class MogaAndroidPlugin(private val activity: Activity) : Plugin(activity) {
         Thread(runnable, "moga-rfcomm-read")
     }
 
+    /** Short blocking jobs (status probes); one shared pool instead of a thread per call. */
+    private val ioExecutor = Executors.newFixedThreadPool(2) { runnable ->
+        Thread(runnable, "moga-io").apply { isDaemon = true }
+    }
+
     // Test mode: the virtual gamepad is silenced so the controller can be tried inside this
     // app without reaching Android. In memory only; leaving the screen switches it off.
     @Volatile private var isolated = false
@@ -121,8 +126,10 @@ class MogaAndroidPlugin(private val activity: Activity) : Plugin(activity) {
         discovery.stop()
         closeConnection()
         MogaConnectionService.stop(activity)
+        uinputBridge.shutdown()
         instance = null
         readExecutor.shutdownNow()
+        ioExecutor.shutdownNow()
         super.onDestroy(activity)
     }
 
@@ -335,27 +342,24 @@ class MogaAndroidPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun getOutputSettings(invoke: Invoke) {
         // The reachability probe opens a socket, which is not allowed on the main thread.
-        Thread(
-            {
-                val helperCommand = try {
-                    helperFiles.startCommand()
-                } catch (error: Exception) {
-                    null
-                }
-                invoke.resolveObject(
-                    mapOf(
-                        "mode" to preferences.outputMode,
-                        "stickLayout" to preferences.stickLayout,
-                        "helperCommand" to helperCommand,
-                        "helperReachable" to uinputBridge.isHelperReachable(),
-                        "helperPort" to UinputBridge.DEFAULT_PORT,
-                        "helperError" to uinputBridge.lastError,
-                        "isolated" to isolated,
-                    ),
-                )
-            },
-            "moga-output-status",
-        ).start()
+        ioExecutor.execute {
+            val helperCommand = try {
+                helperFiles.startCommand()
+            } catch (error: Exception) {
+                null
+            }
+            invoke.resolveObject(
+                mapOf(
+                    "mode" to preferences.outputMode,
+                    "stickLayout" to preferences.stickLayout,
+                    "helperCommand" to helperCommand,
+                    "helperReachable" to uinputBridge.isHelperReachable(),
+                    "helperPort" to UinputBridge.DEFAULT_PORT,
+                    "helperError" to uinputBridge.lastError,
+                    "isolated" to isolated,
+                ),
+            )
+        }
     }
 
     @Command

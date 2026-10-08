@@ -17,7 +17,6 @@ use services::AppState;
 pub fn run() {
     let builder = tauri::Builder::default()
         .manage(AppState::default())
-        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::devices::scan_moga,
             commands::devices::scan_unpaired_devices,
@@ -26,6 +25,7 @@ pub fn run() {
             commands::connection::connect_moga,
             commands::connection::disconnect_moga,
             commands::connection::connection_status,
+            commands::connection::set_state_stream,
             commands::settings::get_key_mapping,
             commands::settings::set_key_mapping,
             commands::settings::get_output_settings,

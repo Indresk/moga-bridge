@@ -1,12 +1,18 @@
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{atomic::AtomicBool, Arc, Mutex, RwLock};
 
 use crate::drivers::{MogaDriver, UnsupportedDriver};
-use crate::schemas::ConnectionStatus;
+use crate::schemas::{ConnectionStatus, MogaState};
 
 /// State shared by every command: the active platform driver and the connection status.
 pub struct AppState {
     driver: RwLock<Arc<dyn MogaDriver>>,
     pub connection: Arc<Mutex<ConnectionStatus>>,
+    /// Whether the frontend is showing live controller state. When off, `moga-state` events
+    /// are not emitted (the platform output still receives every change).
+    pub state_stream: Arc<AtomicBool>,
+    /// The latest decoded state of the active session, handed to the frontend when it starts
+    /// listening (identical reports are filtered, so a new listener may wait a long time).
+    pub last_state: Arc<Mutex<Option<MogaState>>>,
 }
 
 impl Default for AppState {
@@ -14,6 +20,8 @@ impl Default for AppState {
         Self {
             driver: RwLock::new(Arc::new(UnsupportedDriver)),
             connection: Arc::new(Mutex::new(ConnectionStatus::idle())),
+            state_stream: Arc::new(AtomicBool::new(false)),
+            last_state: Arc::new(Mutex::new(None)),
         }
     }
 }

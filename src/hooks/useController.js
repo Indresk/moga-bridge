@@ -4,19 +4,18 @@ import {
   disconnectController,
   getConnectionStatus,
   onControllerError,
-  onControllerState,
   onStatus,
 } from "../lib/api";
 
 const busyStates = ["connecting", "connected", "disconnecting"];
 
 /**
- * Connection lifecycle and the live controller state.
- * `onError(message)` receives transport and protocol errors.
+ * Connection lifecycle. `onError(message)` receives transport and protocol errors.
+ * The live controller state is a separate hook (`useControllerState`) so that the high-rate
+ * stream does not re-render the whole app.
  */
 export function useController({ onError }) {
   const [status, setStatus] = useState({ state: "idle" });
-  const [state, setState] = useState(null);
   const [pairingDeviceId, setPairingDeviceId] = useState(null);
   const [bonding, setBonding] = useState(false);
 
@@ -35,7 +34,6 @@ export function useController({ onError }) {
               setBonding(false);
             }
           }),
-          onControllerState(setState),
           onControllerError(onError),
         ]);
         if (active) unlisteners.push(...subscriptions);
@@ -83,7 +81,6 @@ export function useController({ onError }) {
 
   return {
     status,
-    state,
     pairingDeviceId,
     bonding,
     locked: busyStates.includes(status.state),

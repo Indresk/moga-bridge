@@ -1,4 +1,4 @@
-//! MOGA Mode A wire protocol numbers (see `readme.md` and the decompiled `BluetoothThread`).
+//! MOGA Mode A wire protocol numbers (see `docs/architecture/protocol.md`; sources: the decompiled `BluetoothThread` and `moga-uinput`).
 
 /// First byte of every message we send to the controller.
 pub const COMMAND_MARKER: u8 = 0x5A;

@@ -3,12 +3,14 @@ import Button from "../components/Button";
 import GamepadView from "../components/GamepadView";
 import Panel from "../components/Panel";
 import Switch from "../components/Switch";
+import { useControllerState } from "../hooks/useControllerState";
 
 const hex = (bytes) =>
   bytes.map((byte) => byte.toString(16).padStart(2, "0").toUpperCase()).join(" ");
 
 export default function TestView({ controller, output, onOpenConnection }) {
-  const { status, state } = controller;
+  const { status } = controller;
+  const state = useControllerState();
   const connected = status.state === "connected";
   const { settings, refresh, setIsolated } = output;
   // The picture follows what the virtual gamepad is actually presenting to Android.

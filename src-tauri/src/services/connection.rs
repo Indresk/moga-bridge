@@ -2,8 +2,12 @@
 
 use std::{
     io::Read,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     thread,
+    time::Duration,
 };
 
 use tauri::{AppHandle, Emitter};
@@ -11,9 +15,13 @@ use tauri::{AppHandle, Emitter};
 use crate::constants::{events, protocol::PLAYER_ONE};
 use crate::drivers::{MogaConnection, MogaDriver};
 use crate::protocol::{build_command, Command, PacketStreamParser};
-use crate::schemas::{ConnectionState, ConnectionStatus};
+use crate::schemas::{ConnectionState, ConnectionStatus, MogaState};
+use crate::utils::{change_filter::ChangeFilter, throttle::Throttle};
 
 const READ_BUFFER_LEN: usize = 64;
+
+/// A malformed-report storm must not flood the log and the frontend with one event each.
+const ERROR_EVENT_INTERVAL: Duration = Duration::from_secs(2);
 
 /// The controller powers itself off after a period without input; both the clean close and
 /// the read error that follow look like a lost link, so the message says it is expected.
@@ -21,6 +29,7 @@ const IDLE_POWER_OFF_HINT: &str =
     "El mando se desconectó. Es normal si pasó un rato sin pulsaciones: se apaga solo para ahorrar batería. Enciéndelo y vuelve a conectar.";
 
 pub type SharedStatus = Arc<Mutex<ConnectionStatus>>;
+pub type SharedLastState = Arc<Mutex<Option<MogaState>>>;
 
 /// Move to `Connecting` unless a session is already active.
 pub fn begin(
@@ -48,6 +57,8 @@ pub fn spawn_worker(
     app: AppHandle,
     driver: Arc<dyn MogaDriver>,
     connection: SharedStatus,
+    state_stream: Arc<AtomicBool>,
+    last_state: SharedLastState,
     device_id: String,
 ) -> Result<(), String> {
     let app_for_error = app.clone();
@@ -57,9 +68,19 @@ pub fn spawn_worker(
     thread::Builder::new()
         .name("moga-rfcomm".into())
         .spawn(move || {
-            let result = driver
-                .connect(&device_id)
-                .and_then(|stream| run_session(&app, &connection, &device_id, stream));
+            let result = driver.connect(&device_id).and_then(|stream| {
+                run_session(
+                    &app,
+                    &connection,
+                    &state_stream,
+                    &last_state,
+                    &device_id,
+                    stream,
+                )
+            });
+            if let Ok(mut last) = last_state.lock() {
+                *last = None;
+            }
             finish(&app, &connection, device_id, result);
         })
         .map(|_| ())
@@ -81,6 +102,8 @@ pub fn spawn_worker(
 fn run_session(
     app: &AppHandle,
     connection: &SharedStatus,
+    state_stream: &AtomicBool,
+    last_state: &SharedLastState,
     device_id: &str,
     mut stream: Box<dyn MogaConnection>,
 ) -> Result<(), String> {
@@ -96,6 +119,8 @@ fn run_session(
 
     let mut parser = PacketStreamParser::default();
     let mut buffer = [0_u8; READ_BUFFER_LEN];
+    let mut changes = ChangeFilter::<MogaState>::new();
+    let mut error_events = Throttle::new(ERROR_EVENT_INTERVAL);
 
     loop {
         stream.send_command(build_command(Command::Listen, PLAYER_ONE))?;
@@ -109,14 +134,28 @@ fn run_session(
         for report in parser.feed(&buffer[..bytes_read]) {
             match report {
                 Ok(state) => {
-                    if let Err(error) = stream.dispatch_input_state(&state) {
-                        emit_error(app, format!("Could not forward controller input: {error}"));
+                    if !changes.changed(&state) {
+                        continue;
                     }
-                    if let Err(error) = app.emit(events::STATE, state) {
-                        eprintln!("Could not emit MOGA state event: {error}");
+                    if let Ok(mut last) = last_state.lock() {
+                        *last = Some(state.clone());
+                    }
+                    if let Err(error) = stream.dispatch_input_state(&state) {
+                        if error_events.ready() {
+                            emit_error(app, format!("Could not forward controller input: {error}"));
+                        }
+                    }
+                    if state_stream.load(Ordering::Relaxed) {
+                        if let Err(error) = app.emit(events::STATE, state) {
+                            eprintln!("Could not emit MOGA state event: {error}");
+                        }
                     }
                 }
-                Err(error) => emit_error(app, format!("Rejected MOGA packet: {error}")),
+                Err(error) => {
+                    if error_events.ready() {
+                        emit_error(app, format!("Rejected MOGA packet: {error}"));
+                    }
+                }
             }
         }
     }
