@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python bytecode (scripts/virtual-pad.py)
+__pycache__/
+*.pyc
