@@ -7,17 +7,30 @@ The protocol was reverse-engineered from two external projects that are **not pa
 | | |
 |---|---|
 | App | *MOGA Universal Driver* 3.1.4 (package `net.obsidianx.android.mogaime`) |
-| File | `MOGA Universal Driver_3.1.4_apk-dl.com.apk` (537.2 KB) |
+| File | `MOGA Universal Driver_3.1.4_apk-dl.com.apk` (550,117 bytes = 537.2 KiB) |
+| SHA-256 | `15ec2dafe6daf0b831e42a97356dfbb8d2da876a4741c942efb5fcb4c7bedeea` |
+| SHA-1 | `1caef8c2c538cf14900e297e9a884ef3dacec605` |
 | Download | <https://archive.org/details/moga-universal-driver-android-314> |
 | Decompiler | [jadx](https://github.com/skylot/jadx) **1.5.6** |
 
 It is closed-source third-party software. We use it only to understand the controller's protocol for interoperability; the APK and its decompiled output are **never** committed or redistributed here. Our code is a clean reimplementation: it follows the protocol facts (byte layouts, command bytes, connection order), not the original's source.
 
+### Verifying the download
+
+The hashes depend only on the file's contents, so renaming the file (for example replacing spaces with hyphens so it is easier to pass to a shell) does not change them:
+
+```sh
+sha256sum MOGA-Universal-Driver_3.1.4_apk-dl.com.apk
+# 15ec2dafe6daf0b831e42a97356dfbb8d2da876a4741c942efb5fcb4c7bedeea
+```
+
+If yours differs, you have a different build of the app and class/offset details may not match this documentation.
+
 ### Recreating the decompiled sources
 
 ```sh
 # jadx 1.5.6 (https://github.com/skylot/jadx/releases)
-jadx -d decompilado-moga-universal "MOGA Universal Driver_3.1.4_apk-dl.com.apk"
+jadx -d decompilado-moga-universal MOGA-Universal-Driver_3.1.4_apk-dl.com.apk
 ```
 
 jadx writes two folders: `sources/` (Java) and `resources/` (manifest, `res/`, native libs). The docs refer to this layout.
@@ -59,7 +72,7 @@ moga-workspace/
 ├── moga-tauri/                      this repository
 ├── decompilado-moga-universal/      jadx output (local only)
 ├── moga-uinput/                     clone of the Linux reference (local only)
-└── MOGA Universal Driver_3.1.4_apk-dl.com.apk   (local only, optional)
+└── MOGA-Universal-Driver_3.1.4_apk-dl.com.apk   (local only, optional)
 ```
 
 Nothing in the build depends on the sibling folders. Documentation and code comments that cite a class or file name point into them.
