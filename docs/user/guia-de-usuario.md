@@ -4,6 +4,10 @@ Esta guía es para quien instala el APK de **MOGA Bridge** y quiere usar el mand
 
 > **Compatibilidad:** el mapeo de botones está pensado solo para el **MOGA Pocket** (modo A). Otros modelos (por ejemplo el MOGA Pro) usan una disposición distinta y todavía no son compatibles.
 
+## Para qué existe este proyecto
+
+MOGA Bridge existe **únicamente para dar nueva vida a mandos antiguos que usan este protocolo**, cuyo driver oficial ya está obsoleto y sin soporte. **No se creó, ni se ofrece, con ánimo de lucro en ninguna circunstancia**: no hay ventas, anuncios, rastreo ni pagos. Es un esfuerzo independiente de la comunidad, sin relación con los fabricantes ni respaldado por ellos; los nombres MOGA y PowerA pertenecen a sus propietarios.
+
 ## Qué necesitas
 
 - Un móvil Android con Bluetooth y el APK de MOGA Bridge instalado.

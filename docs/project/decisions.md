@@ -52,3 +52,7 @@ The identifier, package names and scripts avoid personal names; keystores live o
 
 ## MIT licence, and a reimplementation rather than a port
 The project is MIT-licensed. The original MOGA app is proprietary and `moga-uinput` is a separate MIT project; neither is copied. We reimplemented the behaviour from the protocol facts they reveal (byte layouts, command bytes, connection order), wrote our own code and tests, and keep the references out of the repository ([references.md](references.md)). Only a few controller glyphs from the original app are reused, as a homage. If a rights holder objects to them, replace them.
+
+## Purpose: revive obsolete controllers, never for profit
+The app exists to keep working hardware usable after its official driver was abandoned. It is not for profit under any circumstances: no ads, analytics, paywalls or donation prompts, and nothing that depends on collecting user data. It claims no affiliation with the controller or driver makers.
+Note on the licence: MIT does not itself forbid commercial use by others. This is a statement of the maintainers' intent and of what the project itself will do; restricting downstream use would require a different licence, which is a separate decision.

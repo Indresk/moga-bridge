@@ -2,6 +2,10 @@
 
 Thanks for helping! This project mixes Rust, React and Kotlin, and it talks to real Bluetooth hardware, so a little context goes a long way. This page is the shortest path from "I cloned it" to "my change is merged".
 
+## 0. What this project is for
+
+MOGA Bridge exists only to revive old controllers that use this protocol, whose official driver is obsolete. It is **not for profit under any circumstances**, and contributions must respect that: no ads, analytics/tracking, paywalls, donation prompts, referral links or any other monetisation in the app or its docs. See the [README](README.md#purpose-and-non-commercial-intent).
+
 ## 1. Get running (about 15 minutes)
 
 1. Follow [`docs/development/getting-started.md`](docs/development/getting-started.md) (toolchain, phone, `pnpm android:dev`).

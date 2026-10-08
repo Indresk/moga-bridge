@@ -6,6 +6,10 @@ MOGA Bridge is a [Tauri v2](https://tauri.app) app (Rust + React + a Kotlin Andr
 
 > **Compatibility:** the button mapping is designed only for the **MOGA Pocket in Mode A**. Other models (e.g. MOGA Pro) use a different report layout and are not supported yet. The app is Android-only today.
 
+## Purpose and non-commercial intent
+
+This project exists **only to revive old controllers that use this protocol**, whose official driver is obsolete and no longer maintained, so that working hardware does not end up in a drawer. It was **not created, and is not offered, for profit under any circumstances**: no sales, ads, tracking, paywalls or donation requirements, now or later. It is an independent, community effort for preservation and interoperability, **not affiliated with or endorsed by** the makers of the controllers or of the original driver; *MOGA*, *PowerA* and related names belong to their owners and appear here only to describe compatible hardware.
+
 ## Features
 
 - Bluetooth Classic discovery, pairing and connection to the MOGA Pocket, mirroring the original app's behaviour.

@@ -11,6 +11,7 @@ Short rules for AI/code assistants working in this repository. Everything else i
 
 ## Do not
 
+- Add monetisation of any kind (ads, tracking/analytics, paywalls, donation prompts, referral links). The project's purpose is only to revive obsolete controllers, never for profit ([README](README.md#purpose-and-non-commercial-intent)).
 - Call `setPin()` / `abortBroadcast()` or try to hide Android's pairing UI.
 - Widen the virtual-gamepad helper's exposure (it must stay loopback-only and token-protected).
 - Add per-report work on the hot path (see [`docs/architecture/overview.md`](docs/architecture/overview.md#the-hot-path)).

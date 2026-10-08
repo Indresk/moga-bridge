@@ -13,7 +13,7 @@ The protocol was reverse-engineered from two external projects that are **not pa
 | Download | <https://archive.org/details/moga-universal-driver-android-314> |
 | Decompiler | [jadx](https://github.com/skylot/jadx) **1.5.6** |
 
-It is closed-source third-party software. We use it only to understand the controller's protocol for interoperability; the APK and its decompiled output are **never** committed or redistributed here. Our code is a clean reimplementation: it follows the protocol facts (byte layouts, command bytes, connection order), not the original's source.
+It is closed-source third-party software. We use it only to understand the controller's protocol, for interoperability and to revive obsolete hardware (the project is not for profit); the APK and its decompiled output are **never** committed or redistributed here. Our code is a clean reimplementation: it follows the protocol facts (byte layouts, command bytes, connection order), not the original's source.
 
 ### Verifying the download
 

@@ -40,6 +40,10 @@ Read in this order.
 | [`project/legacy-analysis.md`](project/legacy-analysis.md) | What the original app and the Linux reference do, and how we differ. |
 | [`project/references.md`](project/references.md) | Where the original APK and the Linux reference come from (not in the repository) and how to recreate the decompiled sources. |
 
+## Purpose
+
+MOGA Bridge exists only to revive old controllers that use this protocol, whose official driver is obsolete; it is not for profit under any circumstances ([README](../README.md#purpose-and-non-commercial-intent)).
+
 ## Conventions used in these docs
 
 - Code identifiers are in `monospace`; paths are relative to the repository root unless stated.

@@ -70,7 +70,7 @@ Open work only; finished work is summarised at the bottom. Effort: **S** (hours)
 
 ## Out of scope
 
-- AdMob ads and the `show_ads` preference from the legacy app.
+- Any monetisation: ads (the legacy app's AdMob and `show_ads`), tracking, paywalls, donation prompts. The project is not for profit.
 - Root-only paths (the legacy `SystemOutput` chowns `/dev/uinput` with RootTools; the adb helper replaces it without root).
 - A touch-emulation output (the legacy `TouchOutput` is an empty stub and was never built).
 - Hiding or bypassing Android's pairing UI (`setPin`, `abortBroadcast`).
